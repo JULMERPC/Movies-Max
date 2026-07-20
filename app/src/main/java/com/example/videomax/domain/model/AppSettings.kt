@@ -24,13 +24,24 @@ enum class ThemeMode {
 	DARK
 }
 
+enum class AppLanguage {
+	SYSTEM,
+	ENGLISH,
+	SPANISH
+}
+
 data class AppSettings(
 	val themeMode: ThemeMode = ThemeMode.SYSTEM,
 	val sortOption: SortOption = SortOption.DATE_DESC,
 	val defaultPlaybackSpeed: Float = 1.0f,
 	val rememberPlaybackPosition: Boolean = true,
 	val autoPlayNext: Boolean = false,
-	val seekStepSeconds: Int = 10
+	val seekStepSeconds: Int = 10,
+	val language: AppLanguage = AppLanguage.SYSTEM,
+	val showHiddenFiles: Boolean = false,
+	val gesturesEnabled: Boolean = true,
+	val autoPip: Boolean = false,
+	val blacklist: List<String> = emptyList()
 )
 
 data class SubtitleTrack(

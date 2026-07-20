@@ -19,6 +19,7 @@ import com.example.videomax.domain.usecase.GetVideoByIdUseCase
 import com.example.videomax.domain.usecase.ObserveSettingsUseCase
 import com.example.videomax.domain.usecase.SavePlaybackProgressUseCase
 import com.example.videomax.domain.usecase.ToggleFavoriteUseCase
+import com.example.videomax.domain.repository.VideoRepository
 import com.example.videomax.util.SubtitleHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -48,6 +49,9 @@ data class PlayerUiState(
 	val gestureHint: String? = null,
 	val brightness: Float = 0.5f,
 	val volumeFraction: Float = 0.5f,
+	val brightnessOverrideEnabled: Boolean = false,
+	val gesturesEnabled: Boolean = true,
+	val autoPip: Boolean = false,
 	val orientation: PlayerOrientation = PlayerOrientation.AUTO,
 	val repeatMode: QueueRepeatMode = QueueRepeatMode.OFF,
 	val queueIndex: Int = 0,
@@ -64,6 +68,7 @@ class PlayerViewModel @Inject constructor(
 	private val saveProgress: SavePlaybackProgressUseCase,
 	private val toggleFavoriteUseCase: ToggleFavoriteUseCase,
 	private val playbackQueue: PlaybackQueue,
+	private val videoRepository: VideoRepository,
 	observeSettings: ObserveSettingsUseCase
 ) : AndroidViewModel(application) {
 
@@ -80,8 +85,10 @@ class PlayerViewModel @Inject constructor(
 	private var settings: AppSettings = AppSettings()
 	private var progressJob: Job? = null
 	private var hideControlsJob: Job? = null
+	private var gestureHintJob: Job? = null
 	private var externalSubtitles: List<SubtitleTrack> = emptyList()
 	private var isSwitchingMedia = false
+	private var playCountRecordedFor: Long? = null
 
 	private val playerListener = object : Player.Listener {
 		override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -111,8 +118,12 @@ class PlayerViewModel @Inject constructor(
 		viewModelScope.launch {
 			observeSettings().collect { latest ->
 				settings = latest
-				if (_uiState.value.repeatMode == QueueRepeatMode.OFF && latest.autoPlayNext) {
-					// Keep OFF as user-controlled; auto-play next still advances when hasNext
+				_uiState.update {
+					it.copy(
+						gesturesEnabled = latest.gesturesEnabled,
+						autoPip = latest.autoPip,
+						playbackSpeed = if (it.video == null) latest.defaultPlaybackSpeed else it.playbackSpeed
+					)
 				}
 			}
 		}
@@ -156,6 +167,7 @@ class PlayerViewModel @Inject constructor(
 		val keepBrightness = _uiState.value.brightness
 		val keepVolume = _uiState.value.volumeFraction
 		val keepLocked = _uiState.value.isLocked
+		val keepBrightnessOverride = _uiState.value.brightnessOverrideEnabled
 
 		externalSubtitles = SubtitleHelper.findExternalSubtitles(video.path)
 		_uiState.update {
@@ -168,6 +180,7 @@ class PlayerViewModel @Inject constructor(
 				repeatMode = keepRepeat,
 				brightness = keepBrightness,
 				volumeFraction = keepVolume,
+				brightnessOverrideEnabled = keepBrightnessOverride,
 				isLocked = keepLocked,
 				positionMs = 0L,
 				durationMs = video.durationMs,
@@ -175,6 +188,11 @@ class PlayerViewModel @Inject constructor(
 			)
 		}
 		publishQueueState()
+
+		if (playCountRecordedFor != videoId) {
+			playCountRecordedFor = videoId
+			runCatching { videoRepository.incrementPlayCount(videoId) }
+		}
 
 		val subtitleConfigs = externalSubtitles.map { track ->
 			MediaItem.SubtitleConfiguration.Builder(Uri.parse(track.uri))
@@ -352,26 +370,45 @@ class PlayerViewModel @Inject constructor(
 		scheduleHideControls()
 	}
 
-	fun setBrightness(value: Float) {
+	fun syncBrightnessWithoutHint(value: Float) {
 		_uiState.update {
-			it.copy(
-				brightness = value.coerceIn(0.01f, 1f),
-				gestureHint = "Brightness ${(value * 100).toInt()}%"
-			)
+			it.copy(brightness = value.coerceIn(0.01f, 1f))
 		}
 	}
 
-	fun setVolumeFraction(value: Float) {
+	fun setBrightness(value: Float, fromGesture: Boolean = true) {
+		val coerced = value.coerceIn(0.01f, 1f)
 		_uiState.update {
 			it.copy(
-				volumeFraction = value.coerceIn(0f, 1f),
-				gestureHint = "Volume ${(value.coerceIn(0f, 1f) * 100).toInt()}%"
+				brightness = coerced,
+				brightnessOverrideEnabled = if (fromGesture) true else it.brightnessOverrideEnabled,
+				gestureHint = if (fromGesture) "Brightness ${(coerced * 100).toInt()}%" else it.gestureHint
 			)
 		}
+		if (fromGesture) scheduleClearGestureHint()
+	}
+
+	fun setVolumeFraction(value: Float, fromGesture: Boolean = true) {
+		val coerced = value.coerceIn(0f, 1f)
+		_uiState.update {
+			it.copy(
+				volumeFraction = coerced,
+				gestureHint = if (fromGesture) "Volume ${(coerced * 100).toInt()}%" else it.gestureHint
+			)
+		}
+		if (fromGesture) scheduleClearGestureHint()
 	}
 
 	fun clearGestureHint() {
 		_uiState.update { it.copy(gestureHint = null) }
+	}
+
+	private fun scheduleClearGestureHint() {
+		gestureHintJob?.cancel()
+		gestureHintJob = viewModelScope.launch {
+			delay(1_200)
+			clearGestureHint()
+		}
 	}
 
 	fun selectSubtitle(index: Int) {
@@ -472,6 +509,7 @@ class PlayerViewModel @Inject constructor(
 		}
 		progressJob?.cancel()
 		hideControlsJob?.cancel()
+		gestureHintJob?.cancel()
 		player.removeListener(playerListener)
 		player.release()
 		super.onCleared()

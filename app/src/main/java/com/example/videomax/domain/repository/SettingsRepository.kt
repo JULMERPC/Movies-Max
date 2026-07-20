@@ -1,5 +1,6 @@
 package com.example.videomax.domain.repository
 
+import com.example.videomax.domain.model.AppLanguage
 import com.example.videomax.domain.model.AppSettings
 import com.example.videomax.domain.model.SortOption
 import com.example.videomax.domain.model.ThemeMode
@@ -13,4 +14,11 @@ interface SettingsRepository {
 	suspend fun setRememberPlaybackPosition(enabled: Boolean)
 	suspend fun setAutoPlayNext(enabled: Boolean)
 	suspend fun setSeekStepSeconds(seconds: Int)
+	suspend fun setLanguage(language: AppLanguage)
+	suspend fun setShowHiddenFiles(enabled: Boolean)
+	suspend fun setGesturesEnabled(enabled: Boolean)
+	suspend fun setAutoPip(enabled: Boolean)
+	suspend fun setBlacklist(entries: List<String>)
+	suspend fun addBlacklistEntry(entry: String)
+	suspend fun removeBlacklistEntry(entry: String)
 }

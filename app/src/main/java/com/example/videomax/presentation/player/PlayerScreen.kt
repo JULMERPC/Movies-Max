@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -80,6 +81,9 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
@@ -131,13 +135,11 @@ fun PlayerScreen(
 
 		val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
 		val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-		viewModel.setVolumeFraction(currentVolume / maxVolume.toFloat())
+		viewModel.setVolumeFraction(currentVolume / maxVolume.toFloat(), fromGesture = false)
 
 		val lp = window.attributes
-		if (lp.screenBrightness < 0f) {
-			viewModel.setBrightness(0.5f)
-		} else {
-			viewModel.setBrightness(lp.screenBrightness)
+		if (lp.screenBrightness >= 0f) {
+			viewModel.syncBrightnessWithoutHint(lp.screenBrightness)
 		}
 
 		onDispose {
@@ -159,7 +161,8 @@ fun PlayerScreen(
 		}
 	}
 
-	LaunchedEffect(state.brightness) {
+	LaunchedEffect(state.brightness, state.brightnessOverrideEnabled) {
+		if (!state.brightnessOverrideEnabled) return@LaunchedEffect
 		val attrs = activity.window.attributes
 		attrs.screenBrightness = state.brightness
 		activity.window.attributes = attrs
@@ -182,6 +185,21 @@ fun PlayerScreen(
 	}
 
 	val nextEnabled = state.hasNext || state.repeatMode != QueueRepeatMode.OFF
+	val lifecycleOwner = LocalLifecycleOwner.current
+
+	DisposableEffect(lifecycleOwner, state.autoPip, state.isPlaying) {
+		val observer = LifecycleEventObserver { _, event ->
+			if (event == Lifecycle.Event.ON_STOP &&
+				state.autoPip &&
+				state.isPlaying &&
+				!activity.isInPictureInPictureMode
+			) {
+				enterPip(activity, state.video?.width ?: 16, state.video?.height ?: 9)
+			}
+		}
+		lifecycleOwner.lifecycle.addObserver(observer)
+		onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+	}
 
 	Box(
 		modifier = Modifier
@@ -212,32 +230,26 @@ fun PlayerScreen(
 					)
 				}
 				.then(
-					if (state.isLocked) Modifier
+					if (state.isLocked || !state.gesturesEnabled) Modifier
 					else Modifier
 						.pointerInput(Unit) {
 							detectVerticalDragGestures(
-								onDragEnd = {
-									viewModel.clearGestureHint()
-									dragAccum = 0f
-								},
+								onDragEnd = { dragAccum = 0f },
 								onVerticalDrag = { change, dragAmount ->
 									change.consume()
 									val isLeft = change.position.x < size.width / 2f
 									val delta = -dragAmount / size.height.toFloat()
 									if (isLeft) {
-										viewModel.setBrightness(state.brightness + delta)
+										viewModel.setBrightness(state.brightness + delta, fromGesture = true)
 									} else {
-										viewModel.setVolumeFraction(state.volumeFraction + delta)
+										viewModel.setVolumeFraction(state.volumeFraction + delta, fromGesture = true)
 									}
 								}
 							)
 						}
 						.pointerInput(Unit) {
 							detectHorizontalDragGestures(
-								onDragEnd = {
-									viewModel.clearGestureHint()
-									dragAccum = 0f
-								},
+								onDragEnd = { dragAccum = 0f },
 								onHorizontalDrag = { change, dragAmount ->
 									change.consume()
 									dragAccum += dragAmount
@@ -261,9 +273,9 @@ fun PlayerScreen(
 			Text(
 				text = state.gestureHint.orEmpty(),
 				color = Color.White,
-				style = MaterialTheme.typography.headlineMedium,
+				style = MaterialTheme.typography.titleLarge,
 				modifier = Modifier
-					.background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
+					.background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(14.dp))
 					.padding(horizontal = 20.dp, vertical = 12.dp)
 			)
 		}
@@ -279,11 +291,11 @@ fun PlayerScreen(
 						.fillMaxWidth()
 						.background(
 							Brush.verticalGradient(
-								listOf(Color.Black.copy(alpha = 0.7f), Color.Transparent)
+								listOf(Color.Black.copy(alpha = 0.72f), Color.Transparent)
 							)
 						)
 						.statusBarsPadding()
-						.padding(horizontal = 8.dp, vertical = 4.dp)
+						.padding(horizontal = 4.dp, vertical = 2.dp)
 				) {
 					Row(
 						verticalAlignment = Alignment.CenterVertically,
@@ -307,18 +319,14 @@ fun PlayerScreen(
 							if (state.queueSize > 1) {
 								Text(
 									text = "${state.queueIndex + 1} / ${state.queueSize}",
-									color = Color.White.copy(alpha = 0.75f),
-									style = MaterialTheme.typography.labelLarge
+									color = Color.White.copy(alpha = 0.7f),
+									style = MaterialTheme.typography.labelMedium
 								)
 							}
 						}
 						if (!state.isLocked) {
 							IconButton(onClick = viewModel::cycleOrientation) {
-								Icon(
-									Icons.Default.ScreenRotation,
-									contentDescription = "Orientation",
-									tint = Color.White
-								)
+								Icon(Icons.Default.ScreenRotation, null, tint = Color.White)
 							}
 							IconButton(onClick = viewModel::toggleFavorite) {
 								Icon(
@@ -328,9 +336,7 @@ fun PlayerScreen(
 									tint = Color.White
 								)
 							}
-							IconButton(onClick = {
-								state.video?.id?.let(onOpenDetails)
-							}) {
+							IconButton(onClick = { state.video?.id?.let(onOpenDetails) }) {
 								Icon(Icons.Default.Info, null, tint = Color.White)
 							}
 						}
@@ -342,93 +348,19 @@ fun PlayerScreen(
 							)
 						}
 					}
-					if (!state.isLocked) {
-						Text(
-							text = when (state.orientation) {
-								PlayerOrientation.AUTO -> "Orientation: Auto"
-								PlayerOrientation.PORTRAIT -> "Orientation: Portrait"
-								PlayerOrientation.LANDSCAPE -> "Orientation: Landscape"
-							},
-							color = Color.White.copy(alpha = 0.7f),
-							style = MaterialTheme.typography.labelLarge,
-							modifier = Modifier.padding(start = 56.dp, bottom = 4.dp)
-						)
-					}
 				}
 
 				if (!state.isLocked) {
-					Row(
-						modifier = Modifier.align(Alignment.Center),
-						horizontalArrangement = Arrangement.spacedBy(20.dp),
-						verticalAlignment = Alignment.CenterVertically
-					) {
-						IconButton(
-							onClick = viewModel::playPrevious,
-							modifier = Modifier
-								.size(52.dp)
-								.background(Color.Black.copy(0.35f), CircleShape)
-						) {
-							Icon(
-								Icons.Default.SkipPrevious,
-								contentDescription = "Previous",
-								tint = Color.White,
-								modifier = Modifier.size(30.dp)
-							)
-						}
-						IconButton(
-							onClick = { viewModel.seekBy(-viewModel.seekStepMs()) },
-							modifier = Modifier
-								.size(52.dp)
-								.background(Color.Black.copy(0.35f), CircleShape)
-						) {
-							Icon(Icons.Default.Replay10, null, tint = Color.White, modifier = Modifier.size(28.dp))
-						}
-						IconButton(
-							onClick = viewModel::togglePlayPause,
-							modifier = Modifier
-								.size(72.dp)
-								.background(Color.Black.copy(0.45f), CircleShape)
-						) {
-							Icon(
-								if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-								null,
-								tint = Color.White,
-								modifier = Modifier.size(40.dp)
-							)
-						}
-						IconButton(
-							onClick = { viewModel.seekBy(viewModel.seekStepMs()) },
-							modifier = Modifier
-								.size(52.dp)
-								.background(Color.Black.copy(0.35f), CircleShape)
-						) {
-							Icon(Icons.Default.Forward10, null, tint = Color.White, modifier = Modifier.size(28.dp))
-						}
-						IconButton(
-							onClick = viewModel::playNext,
-							enabled = nextEnabled,
-							modifier = Modifier
-								.size(52.dp)
-								.background(Color.Black.copy(0.35f), CircleShape)
-						) {
-							Icon(
-								Icons.Default.SkipNext,
-								contentDescription = "Next",
-								tint = if (nextEnabled) Color.White else Color.White.copy(alpha = 0.35f),
-								modifier = Modifier.size(30.dp)
-							)
-						}
-					}
-
 					Column(
 						modifier = Modifier
 							.align(Alignment.BottomCenter)
 							.fillMaxWidth()
 							.background(
 								Brush.verticalGradient(
-									listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f))
+									listOf(Color.Transparent, Color.Black.copy(alpha = 0.82f))
 								)
 							)
+							.navigationBarsPadding()
 							.padding(horizontal = 12.dp, vertical = 10.dp)
 					) {
 						Row(verticalAlignment = Alignment.CenterVertically) {
@@ -460,6 +392,57 @@ fun PlayerScreen(
 								style = MaterialTheme.typography.labelLarge
 							)
 						}
+
+						Row(
+							modifier = Modifier
+								.fillMaxWidth()
+								.padding(vertical = 6.dp),
+							horizontalArrangement = Arrangement.SpaceEvenly,
+							verticalAlignment = Alignment.CenterVertically
+						) {
+							IconButton(onClick = { viewModel.seekBy(-viewModel.seekStepMs()) }) {
+								Icon(Icons.Default.Replay10, null, tint = Color.White, modifier = Modifier.size(28.dp))
+							}
+							IconButton(
+								onClick = viewModel::playPrevious,
+								modifier = Modifier
+									.size(52.dp)
+									.background(Color.White.copy(alpha = 0.12f), CircleShape)
+							) {
+								Icon(Icons.Default.SkipPrevious, "Previous", tint = Color.White, modifier = Modifier.size(32.dp))
+							}
+							IconButton(
+								onClick = viewModel::togglePlayPause,
+								modifier = Modifier
+									.size(68.dp)
+									.background(MaterialTheme.colorScheme.primary, CircleShape)
+							) {
+								Icon(
+									if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+									null,
+									tint = MaterialTheme.colorScheme.onPrimary,
+									modifier = Modifier.size(36.dp)
+								)
+							}
+							IconButton(
+								onClick = viewModel::playNext,
+								enabled = nextEnabled,
+								modifier = Modifier
+									.size(52.dp)
+									.background(Color.White.copy(alpha = 0.12f), CircleShape)
+							) {
+								Icon(
+									Icons.Default.SkipNext,
+									"Next",
+									tint = if (nextEnabled) Color.White else Color.White.copy(0.35f),
+									modifier = Modifier.size(32.dp)
+								)
+							}
+							IconButton(onClick = { viewModel.seekBy(viewModel.seekStepMs()) }) {
+								Icon(Icons.Default.Forward10, null, tint = Color.White, modifier = Modifier.size(28.dp))
+							}
+						}
+
 						Row(
 							modifier = Modifier.fillMaxWidth(),
 							horizontalArrangement = Arrangement.SpaceBetween,
@@ -469,10 +452,7 @@ fun PlayerScreen(
 								Row(verticalAlignment = Alignment.CenterVertically) {
 									Icon(Icons.Default.Speed, null, tint = Color.White)
 									Spacer(modifier = Modifier.width(4.dp))
-									Text(
-										Formatters.formatSpeed(state.playbackSpeed),
-										color = Color.White
-									)
+									Text(Formatters.formatSpeed(state.playbackSpeed), color = Color.White)
 								}
 							}
 							IconButton(onClick = viewModel::cycleRepeatMode) {
@@ -541,12 +521,13 @@ fun PlayerScreen(
 							}
 						}
 					}
-				} else {
+				} else if (state.controlsVisible) {
 					Text(
 						text = "Screen locked — tap lock to unlock",
 						color = Color.White.copy(alpha = 0.8f),
 						modifier = Modifier
 							.align(Alignment.BottomCenter)
+							.navigationBarsPadding()
 							.padding(24.dp)
 					)
 				}

@@ -1,6 +1,7 @@
 package com.example.videomax.data.repository
 
 import com.example.videomax.data.local.datastore.SettingsDataStore
+import com.example.videomax.domain.model.AppLanguage
 import com.example.videomax.domain.model.AppSettings
 import com.example.videomax.domain.model.SortOption
 import com.example.videomax.domain.model.ThemeMode
@@ -29,4 +30,18 @@ class SettingsRepositoryImpl @Inject constructor(
 	override suspend fun setAutoPlayNext(enabled: Boolean) = dataStore.setAutoPlayNext(enabled)
 
 	override suspend fun setSeekStepSeconds(seconds: Int) = dataStore.setSeekStepSeconds(seconds)
+
+	override suspend fun setLanguage(language: AppLanguage) = dataStore.setLanguage(language)
+
+	override suspend fun setShowHiddenFiles(enabled: Boolean) = dataStore.setShowHiddenFiles(enabled)
+
+	override suspend fun setGesturesEnabled(enabled: Boolean) = dataStore.setGesturesEnabled(enabled)
+
+	override suspend fun setAutoPip(enabled: Boolean) = dataStore.setAutoPip(enabled)
+
+	override suspend fun setBlacklist(entries: List<String>) = dataStore.setBlacklist(entries)
+
+	override suspend fun addBlacklistEntry(entry: String) = dataStore.addBlacklistEntry(entry)
+
+	override suspend fun removeBlacklistEntry(entry: String) = dataStore.removeBlacklistEntry(entry)
 }

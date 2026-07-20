@@ -3,8 +3,6 @@ package com.example.videomax.presentation.navigation
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
@@ -24,12 +22,11 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.videomax.presentation.details.DetailsScreen
-import com.example.videomax.presentation.favorites.FavoritesScreen
-import com.example.videomax.presentation.history.HistoryScreen
 import com.example.videomax.presentation.library.LibraryScreen
 import com.example.videomax.presentation.player.PlayerScreen
 import com.example.videomax.presentation.playlists.PlaylistDetailScreen
 import com.example.videomax.presentation.playlists.PlaylistsScreen
+import com.example.videomax.presentation.playlists.SmartCollectionScreen
 import com.example.videomax.presentation.settings.SettingsScreen
 
 private data class BottomItem(
@@ -45,17 +42,13 @@ fun VideoPlayerNavHost() {
 	val currentRoute = backStack?.destination?.route
 	val showBottomBar = currentRoute in setOf(
 		Screen.Library.route,
-		Screen.Favorites.route,
 		Screen.Playlists.route,
-		Screen.History.route,
 		Screen.Settings.route
 	)
 
 	val items = listOf(
 		BottomItem(Screen.Library, "Library", Icons.Default.Home),
-		BottomItem(Screen.Favorites, "Favorites", Icons.Default.Favorite),
 		BottomItem(Screen.Playlists, "Playlists", Icons.AutoMirrored.Filled.PlaylistPlay),
-		BottomItem(Screen.History, "History", Icons.Default.History),
 		BottomItem(Screen.Settings, "Settings", Icons.Default.Settings)
 	)
 
@@ -98,24 +91,13 @@ fun VideoPlayerNavHost() {
 					}
 				)
 			}
-			composable(Screen.Favorites.route) {
-				FavoritesScreen(
-					onOpenPlayer = { id ->
-						navController.navigate(Screen.Player.createRoute(id))
-					}
-				)
-			}
 			composable(Screen.Playlists.route) {
 				PlaylistsScreen(
 					onOpenPlaylist = { id ->
 						navController.navigate(Screen.PlaylistDetail.createRoute(id))
-					}
-				)
-			}
-			composable(Screen.History.route) {
-				HistoryScreen(
-					onOpenPlayer = { id ->
-						navController.navigate(Screen.Player.createRoute(id))
+					},
+					onOpenSmart = { type ->
+						navController.navigate(Screen.SmartCollection.createRoute(type))
 					}
 				)
 			}
@@ -149,6 +131,17 @@ fun VideoPlayerNavHost() {
 				arguments = listOf(navArgument("playlistId") { type = NavType.LongType })
 			) {
 				PlaylistDetailScreen(
+					onBack = { navController.popBackStack() },
+					onOpenPlayer = { id ->
+						navController.navigate(Screen.Player.createRoute(id))
+					}
+				)
+			}
+			composable(
+				route = Screen.SmartCollection.route,
+				arguments = listOf(navArgument("type") { type = NavType.StringType })
+			) {
+				SmartCollectionScreen(
 					onBack = { navController.popBackStack() },
 					onOpenPlayer = { id ->
 						navController.navigate(Screen.Player.createRoute(id))

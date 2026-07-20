@@ -1,10 +1,12 @@
 package com.example.videomax.presentation.library
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -12,7 +14,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
@@ -27,6 +28,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -41,6 +43,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,10 +51,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.paging.LoadState
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import com.example.videomax.domain.model.SortOption
 import com.example.videomax.presentation.components.EmptyState
 import com.example.videomax.presentation.components.VideoGridItem
 import com.example.videomax.presentation.components.VideoListItem
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,7 +68,9 @@ fun LibraryScreen(
 	viewModel: LibraryViewModel = hiltViewModel()
 ) {
 	val state by viewModel.uiState.collectAsStateWithLifecycle()
+	val pagingItems = viewModel.videos.collectAsLazyPagingItems()
 	val snackbarHostState = remember { SnackbarHostState() }
+	val scope = rememberCoroutineScope()
 	var sortMenuExpanded by remember { mutableStateOf(false) }
 
 	LaunchedEffect(state.message) {
@@ -76,9 +85,9 @@ fun LibraryScreen(
 			TopAppBar(
 				title = {
 					Column {
-						Text("videomax")
+						Text("videomax", style = MaterialTheme.typography.headlineSmall)
 						Text(
-							text = "${state.videos.size} videos",
+							text = "${state.videoCount} videos",
 							style = MaterialTheme.typography.bodyMedium,
 							color = MaterialTheme.colorScheme.onSurfaceVariant
 						)
@@ -115,7 +124,7 @@ fun LibraryScreen(
 					}
 				},
 				colors = TopAppBarDefaults.topAppBarColors(
-					containerColor = MaterialTheme.colorScheme.background
+					containerColor = MaterialTheme.colorScheme.surface
 				)
 			)
 		},
@@ -126,16 +135,23 @@ fun LibraryScreen(
 				.fillMaxSize()
 				.padding(padding)
 		) {
+			AnimatedVisibility(visible = state.isScanning) {
+				LinearProgressIndicator(
+					progress = { state.scanProgress.coerceIn(0f, 1f) },
+					modifier = Modifier.fillMaxWidth()
+				)
+			}
+
 			TextField(
 				value = state.query,
 				onValueChange = viewModel::onQueryChange,
 				modifier = Modifier
 					.fillMaxWidth()
-					.padding(horizontal = 16.dp),
+					.padding(horizontal = 16.dp, vertical = 8.dp),
 				placeholder = { Text("Search videos or folders") },
 				leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
 				singleLine = true,
-				shape = MaterialTheme.shapes.large,
+				shape = MaterialTheme.shapes.extraLarge,
 				colors = TextFieldDefaults.colors(
 					focusedIndicatorColor = Color.Transparent,
 					unfocusedIndicatorColor = Color.Transparent,
@@ -145,7 +161,7 @@ fun LibraryScreen(
 
 			if (state.folders.isNotEmpty()) {
 				LazyRow(
-					contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+					contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
 					horizontalArrangement = Arrangement.spacedBy(8.dp)
 				) {
 					item {
@@ -165,13 +181,16 @@ fun LibraryScreen(
 				}
 			}
 
+			val refreshing = pagingItems.loadState.refresh is LoadState.Loading &&
+				pagingItems.itemCount == 0
+
 			when {
-				state.isScanning && state.videos.isEmpty() -> {
+				refreshing && state.isScanning -> {
 					Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
 						CircularProgressIndicator()
 					}
 				}
-				state.videos.isEmpty() -> {
+				pagingItems.itemCount == 0 && !state.isScanning -> {
 					EmptyState(
 						title = "No videos found",
 						subtitle = "Grant media permission and tap refresh to scan your device."
@@ -181,16 +200,22 @@ fun LibraryScreen(
 					LazyVerticalGrid(
 						columns = GridCells.Adaptive(168.dp),
 						contentPadding = PaddingValues(16.dp),
-						verticalArrangement = Arrangement.spacedBy(12.dp),
-						horizontalArrangement = Arrangement.spacedBy(12.dp),
+						verticalArrangement = Arrangement.spacedBy(14.dp),
+						horizontalArrangement = Arrangement.spacedBy(14.dp),
 						modifier = Modifier.fillMaxSize()
 					) {
-						items(state.videos, key = { it.id }) { video ->
+						items(
+							count = pagingItems.itemCount,
+							key = pagingItems.itemKey { it.id }
+						) { index ->
+							val video = pagingItems[index] ?: return@items
 							VideoGridItem(
 								video = video,
 								onClick = {
-									viewModel.preparePlayback(video.id)
-									onOpenPlayer(video.id)
+									scope.launch {
+										viewModel.preparePlayback(video.id)
+										onOpenPlayer(video.id)
+									}
 								},
 								onFavoriteClick = { viewModel.onFavorite(video.id) }
 							)
@@ -199,12 +224,18 @@ fun LibraryScreen(
 				}
 				else -> {
 					LazyColumn(modifier = Modifier.fillMaxSize()) {
-						items(state.videos, key = { it.id }) { video ->
+						items(
+							count = pagingItems.itemCount,
+							key = pagingItems.itemKey { it.id }
+						) { index ->
+							val video = pagingItems[index] ?: return@items
 							VideoListItem(
 								video = video,
 								onClick = {
-									viewModel.preparePlayback(video.id)
-									onOpenPlayer(video.id)
+									scope.launch {
+										viewModel.preparePlayback(video.id)
+										onOpenPlayer(video.id)
+									}
 								},
 								onFavoriteClick = { viewModel.onFavorite(video.id) }
 							)

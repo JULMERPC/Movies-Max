@@ -23,7 +23,8 @@ fun VideoEntity.toDomain(): Video = Video(
 	folderName = folderName,
 	isFavorite = isFavorite,
 	lastPositionMs = lastPositionMs,
-	codec = codec
+	codec = codec,
+	playCount = playCount
 )
 
 fun Video.toEntity(): VideoEntity = VideoEntity(
@@ -41,7 +42,8 @@ fun Video.toEntity(): VideoEntity = VideoEntity(
 	folderName = folderName,
 	isFavorite = isFavorite,
 	lastPositionMs = lastPositionMs,
-	codec = codec
+	codec = codec,
+	playCount = playCount
 )
 
 fun PlaylistWithCount.toDomain(): Playlist = Playlist(

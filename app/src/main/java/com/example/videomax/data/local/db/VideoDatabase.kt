@@ -17,7 +17,7 @@ import com.example.videomax.data.local.db.entity.VideoEntity
 		PlaylistVideoCrossRef::class,
 		HistoryEntity::class
 	],
-	version = 1,
+	version = 2,
 	exportSchema = false
 )
 abstract class VideoDatabase : RoomDatabase() {

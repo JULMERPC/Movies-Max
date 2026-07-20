@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<string name="app_name">videomax</string>
+	<string name="settings_title">Configuración</string>
+	<string name="settings_appearance">Apariencia</string>
+	<string name="settings_theme">Tema</string>
+	<string name="theme_system">Sistema</string>
+	<string name="theme_light">Claro</string>
+	<string name="theme_dark">Oscuro</string>
+	<string name="settings_language">Idioma</string>
+	<string name="lang_system">Sistema</string>
+	<string name="lang_english">Inglés</string>
+	<string name="lang_spanish">Español</string>
+	<string name="settings_playback">Reproducción</string>
+	<string name="settings_remember_position">Recordar posición</string>
+	<string name="settings_autoplay_next">Reproducir siguiente automáticamente</string>
+	<string name="settings_speed">Velocidad predeterminada %1$s</string>
+	<string name="settings_seek_step">Salto: %1$d s</string>
+	<string name="settings_player">Controles del reproductor</string>
+	<string name="settings_gestures">Control por gestos</string>
+	<string name="settings_gestures_desc">Gestos de brillo, volumen y búsqueda</string>
+	<string name="settings_auto_pip">PiP automático</string>
+	<string name="settings_auto_pip_desc">Activar Picture-in-Picture al salir del reproductor</string>
+	<string name="settings_library">Biblioteca</string>
+	<string name="settings_hidden_files">Mostrar archivos ocultos</string>
+	<string name="settings_hidden_files_desc">Incluir archivos y carpetas ocultas al escanear</string>
+	<string name="settings_blacklist">Lista negra</string>
+	<string name="settings_blacklist_desc">Oculta carpetas o nombres que coincidan. Vuelve a escanear la biblioteca para aplicar.</string>
+	<string name="settings_blacklist_add">Agregar entrada</string>
+	<string name="settings_blacklist_hint">Nombre de carpeta o archivo</string>
+	<string name="settings_blacklist_empty">Sin entradas en la lista negra</string>
+	<string name="settings_about">Acerca de</string>
+	<string name="settings_about_desc">Media3 ExoPlayer · Material Design 3 · Clean Architecture</string>
+	<string name="add">Agregar</string>
+	<string name="cancel">Cancelar</string>
+	<string name="delete">Eliminar</string>
+</resources>

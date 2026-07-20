@@ -1,5 +1,6 @@
 package com.example.videomax.domain.usecase
 
+import androidx.paging.PagingData
 import com.example.videomax.domain.model.SortOption
 import com.example.videomax.domain.model.Video
 import com.example.videomax.domain.repository.VideoRepository
@@ -9,14 +10,21 @@ import javax.inject.Inject
 class ScanVideosUseCase @Inject constructor(
 	private val repository: VideoRepository
 ) {
-	suspend operator fun invoke(): Int = repository.scanDeviceVideos()
+	suspend operator fun invoke(
+		onProgress: (suspend (indexed: Int, totalHint: Int) -> Unit)? = null
+	): Int = repository.scanDeviceVideos(onProgress)
 }
 
-class ObserveVideosUseCase @Inject constructor(
+class PagingVideosUseCase @Inject constructor(
 	private val repository: VideoRepository
 ) {
-	operator fun invoke(query: String, sortOption: SortOption): Flow<List<Video>> =
-		repository.observeVideos(query, sortOption)
+	operator fun invoke(
+		query: String,
+		sortOption: SortOption,
+		folder: String?
+	): Flow<PagingData<Video>> =
+		if (folder == null) repository.pagingVideos(query, sortOption)
+		else repository.pagingVideosByFolder(folder, sortOption)
 }
 
 class GetVideoByIdUseCase @Inject constructor(

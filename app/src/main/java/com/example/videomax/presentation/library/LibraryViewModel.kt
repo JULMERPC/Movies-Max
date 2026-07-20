@@ -2,17 +2,20 @@ package com.example.videomax.presentation.library
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
 import com.example.videomax.domain.model.SortOption
 import com.example.videomax.domain.model.Video
 import com.example.videomax.domain.repository.PlaylistRepository
 import com.example.videomax.domain.repository.SettingsRepository
 import com.example.videomax.domain.repository.VideoRepository
-import com.example.videomax.domain.usecase.ObserveVideosUseCase
+import com.example.videomax.domain.usecase.PagingVideosUseCase
 import com.example.videomax.domain.usecase.ScanVideosUseCase
 import com.example.videomax.domain.usecase.ToggleFavoriteUseCase
 import com.example.videomax.presentation.player.PlaybackQueue
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -24,11 +27,12 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class LibraryUiState(
-	val videos: List<Video> = emptyList(),
 	val folders: List<String> = emptyList(),
+	val videoCount: Int = 0,
 	val query: String = "",
 	val sortOption: SortOption = SortOption.DATE_DESC,
 	val isScanning: Boolean = false,
+	val scanProgress: Float = 0f,
 	val isGrid: Boolean = true,
 	val selectedFolder: String? = null,
 	val message: String? = null
@@ -37,7 +41,7 @@ data class LibraryUiState(
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
-	private val observeVideos: ObserveVideosUseCase,
+	private val pagingVideos: PagingVideosUseCase,
 	private val scanVideos: ScanVideosUseCase,
 	private val toggleFavorite: ToggleFavoriteUseCase,
 	private val videoRepository: VideoRepository,
@@ -49,34 +53,47 @@ class LibraryViewModel @Inject constructor(
 	private val query = MutableStateFlow("")
 	private val sortOption = MutableStateFlow(SortOption.DATE_DESC)
 	private val isScanning = MutableStateFlow(false)
+	private val scanProgress = MutableStateFlow(0f)
 	private val isGrid = MutableStateFlow(true)
 	private val selectedFolder = MutableStateFlow<String?>(null)
 	private val message = MutableStateFlow<String?>(null)
 
-	private val videosFlow = combine(query, sortOption, selectedFolder) { q, sort, folder ->
+	val videos: Flow<PagingData<Video>> = combine(query, sortOption, selectedFolder) { q, sort, folder ->
 		Triple(q, sort, folder)
 	}.flatMapLatest { (q, sort, folder) ->
-		if (folder == null) observeVideos(q, sort)
-		else videoRepository.observeVideosByFolder(folder, sort)
+		pagingVideos(q, sort, folder)
+	}.cachedIn(viewModelScope)
+
+	private val layoutControls = combine(isScanning, scanProgress, isGrid, selectedFolder) {
+			scanning, progress, grid, folder ->
+		LayoutControls(scanning, progress, grid, folder)
 	}
 
-	private val controls = combine(query, sortOption, isScanning, isGrid, selectedFolder) {
-			q, sort, scanning, grid, folder ->
-		LibraryControls(q, sort, scanning, grid, folder)
+	private val controls = combine(query, sortOption, layoutControls) { q, sort, layout ->
+		LibraryControls(
+			query = q,
+			sortOption = sort,
+			isScanning = layout.isScanning,
+			scanProgress = layout.scanProgress,
+			isGrid = layout.isGrid,
+			selectedFolder = layout.selectedFolder
+		)
 	}
+
 
 	val uiState: StateFlow<LibraryUiState> = combine(
-		videosFlow,
 		videoRepository.observeFolders(),
+		videoRepository.observeVideoCount(),
 		controls,
 		message
-	) { videos, folders, ctrl, msg ->
+	) { folders, count, ctrl, msg ->
 		LibraryUiState(
-			videos = videos,
 			folders = folders,
+			videoCount = count,
 			query = ctrl.query,
 			sortOption = ctrl.sortOption,
 			isScanning = ctrl.isScanning,
+			scanProgress = ctrl.scanProgress,
 			isGrid = ctrl.isGrid,
 			selectedFolder = ctrl.selectedFolder,
 			message = msg
@@ -112,10 +129,16 @@ class LibraryViewModel @Inject constructor(
 	fun refresh() {
 		viewModelScope.launch {
 			isScanning.value = true
-			runCatching { scanVideos() }
+			scanProgress.value = 0f
+			runCatching {
+				scanVideos { indexed, total ->
+					scanProgress.value = if (total > 0) indexed.toFloat() / total else 0f
+				}
+			}
 				.onSuccess { count -> message.value = "Indexed $count videos" }
 				.onFailure { message.value = it.message ?: "Scan failed" }
 			isScanning.value = false
+			scanProgress.value = 1f
 		}
 	}
 
@@ -135,22 +158,27 @@ class LibraryViewModel @Inject constructor(
 		}
 	}
 
-	fun addToPlaylist(playlistId: Long, videoId: Long) {
-		viewModelScope.launch {
-			playlistRepository.addVideoToPlaylist(playlistId, videoId)
-			message.value = "Added to playlist"
-		}
-	}
-
-	fun preparePlayback(videoId: Long) {
-		val ids = uiState.value.videos.map { it.id }
+	suspend fun preparePlayback(videoId: Long) {
+		val ids = videoRepository.getVideoIds(
+			query = query.value,
+			sortOption = sortOption.value,
+			folder = selectedFolder.value
+		)
 		playbackQueue.setQueue(ids, videoId)
 	}
+
+	private data class LayoutControls(
+		val isScanning: Boolean,
+		val scanProgress: Float,
+		val isGrid: Boolean,
+		val selectedFolder: String?
+	)
 
 	private data class LibraryControls(
 		val query: String,
 		val sortOption: SortOption,
 		val isScanning: Boolean,
+		val scanProgress: Float,
 		val isGrid: Boolean,
 		val selectedFolder: String?
 	)

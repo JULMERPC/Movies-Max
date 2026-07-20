@@ -61,6 +61,7 @@ kotlin {
 
 dependencies {
 	implementation(libs.androidx.core.ktx)
+	implementation(libs.androidx.appcompat)
 	implementation(libs.androidx.lifecycle.runtime.ktx)
 	implementation(libs.androidx.lifecycle.runtime.compose)
 	implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -80,7 +81,11 @@ dependencies {
 
 	implementation(libs.androidx.room.runtime)
 	implementation(libs.androidx.room.ktx)
+	implementation(libs.androidx.room.paging)
 	ksp(libs.androidx.room.compiler)
+
+	implementation(libs.androidx.paging.runtime)
+	implementation(libs.androidx.paging.compose)
 
 	implementation(libs.androidx.datastore.preferences)
 

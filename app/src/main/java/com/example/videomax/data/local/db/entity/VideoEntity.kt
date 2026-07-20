@@ -10,7 +10,8 @@ import androidx.room.PrimaryKey
 		Index(value = ["displayName"]),
 		Index(value = ["folderName"]),
 		Index(value = ["dateAdded"]),
-		Index(value = ["isFavorite"])
+		Index(value = ["isFavorite"]),
+		Index(value = ["playCount"])
 	]
 )
 data class VideoEntity(
@@ -28,5 +29,6 @@ data class VideoEntity(
 	val folderName: String,
 	val isFavorite: Boolean = false,
 	val lastPositionMs: Long = 0L,
-	val codec: String? = null
+	val codec: String? = null,
+	val playCount: Int = 0
 )
