@@ -7,6 +7,7 @@ import coil.decode.VideoFrameDecoder
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.Dispatchers
 
 @HiltAndroidApp
 class VideoPlayerProApp : Application(), ImageLoaderFactory {
@@ -14,17 +15,20 @@ class VideoPlayerProApp : Application(), ImageLoaderFactory {
 	override fun newImageLoader(): ImageLoader =
 		ImageLoader.Builder(this)
 			.components { add(VideoFrameDecoder.Factory()) }
+			// Limit parallel video-frame decodes — too many MediaCodec jobs freeze the UI.
+			.decoderDispatcher(Dispatchers.IO.limitedParallelism(2))
+			.fetcherDispatcher(Dispatchers.IO.limitedParallelism(4))
 			.memoryCache {
 				MemoryCache.Builder(this)
-					.maxSizePercent(0.25)
+					.maxSizePercent(0.20)
 					.build()
 			}
 			.diskCache {
 				DiskCache.Builder()
 					.directory(cacheDir.resolve("video_thumbs"))
-					.maxSizeBytes(250L * 1024 * 1024)
+					.maxSizeBytes(200L * 1024 * 1024)
 					.build()
 			}
-			.crossfade(true)
+			.crossfade(false)
 			.build()
 }

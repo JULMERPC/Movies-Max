@@ -4,12 +4,14 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.map
+import com.example.videomax.data.local.db.QueueWindowSql
 import com.example.videomax.data.local.db.dao.VideoDao
 import com.example.videomax.data.local.db.entity.VideoEntity
 import com.example.videomax.data.local.mediastore.MediaStoreVideoScanner
 import com.example.videomax.data.mapper.toDomain
 import com.example.videomax.domain.model.SortOption
 import com.example.videomax.domain.model.Video
+import com.example.videomax.domain.repository.QueueWindow
 import com.example.videomax.domain.repository.SettingsRepository
 import com.example.videomax.domain.repository.VideoRepository
 import kotlinx.coroutines.Dispatchers
@@ -18,7 +20,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
-import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -38,12 +39,31 @@ class VideoRepositoryImpl @Inject constructor(
 
 	override fun pagingVideos(query: String, sortOption: SortOption): Flow<PagingData<Video>> =
 		Pager(pagingConfig) {
-			videoDao.pagingVideos(query.trim(), sortOption.name)
+			val q = query.trim()
+			when (sortOption) {
+				SortOption.DATE_DESC -> videoDao.pagingVideosDateDesc(q)
+				SortOption.DATE_ASC -> videoDao.pagingVideosDateAsc(q)
+				SortOption.NAME_ASC -> videoDao.pagingVideosNameAsc(q)
+				SortOption.NAME_DESC -> videoDao.pagingVideosNameDesc(q)
+				SortOption.DURATION_DESC -> videoDao.pagingVideosDurationDesc(q)
+				SortOption.DURATION_ASC -> videoDao.pagingVideosDurationAsc(q)
+				SortOption.SIZE_DESC -> videoDao.pagingVideosSizeDesc(q)
+				SortOption.SIZE_ASC -> videoDao.pagingVideosSizeAsc(q)
+			}
 		}.flow.map { paging -> paging.map { it.toDomain() } }
 
 	override fun pagingVideosByFolder(folder: String, sortOption: SortOption): Flow<PagingData<Video>> =
 		Pager(pagingConfig) {
-			videoDao.pagingByFolder(folder, sortOption.name)
+			when (sortOption) {
+				SortOption.DATE_DESC -> videoDao.pagingByFolderDateDesc(folder)
+				SortOption.DATE_ASC -> videoDao.pagingByFolderDateAsc(folder)
+				SortOption.NAME_ASC -> videoDao.pagingByFolderNameAsc(folder)
+				SortOption.NAME_DESC -> videoDao.pagingByFolderNameDesc(folder)
+				SortOption.DURATION_DESC -> videoDao.pagingByFolderDurationDesc(folder)
+				SortOption.DURATION_ASC -> videoDao.pagingByFolderDurationAsc(folder)
+				SortOption.SIZE_DESC -> videoDao.pagingByFolderSizeDesc(folder)
+				SortOption.SIZE_ASC -> videoDao.pagingByFolderSizeAsc(folder)
+			}
 		}.flow.map { paging -> paging.map { it.toDomain() } }
 
 	override fun observeFolders(): Flow<List<String>> = videoDao.observeFolders()
@@ -66,58 +86,197 @@ class VideoRepositoryImpl @Inject constructor(
 		sortOption: SortOption,
 		folder: String?
 	): List<Long> = withContext(Dispatchers.IO) {
+		val q = query.trim()
 		if (folder == null) {
-			videoDao.getVideoIds(query.trim(), sortOption.name)
+			when (sortOption) {
+				SortOption.DATE_DESC -> videoDao.getVideoIdsDateDesc(q)
+				SortOption.DATE_ASC -> videoDao.getVideoIdsDateAsc(q)
+				SortOption.NAME_ASC -> videoDao.getVideoIdsNameAsc(q)
+				SortOption.NAME_DESC -> videoDao.getVideoIdsNameDesc(q)
+				SortOption.DURATION_DESC -> videoDao.getVideoIdsDurationDesc(q)
+				SortOption.DURATION_ASC -> videoDao.getVideoIdsDurationAsc(q)
+				SortOption.SIZE_DESC -> videoDao.getVideoIdsSizeDesc(q)
+				SortOption.SIZE_ASC -> videoDao.getVideoIdsSizeAsc(q)
+			}
 		} else {
-			videoDao.getVideoIdsByFolder(folder, sortOption.name)
+			when (sortOption) {
+				SortOption.DATE_DESC -> videoDao.getVideoIdsByFolderDateDesc(folder)
+				SortOption.DATE_ASC -> videoDao.getVideoIdsByFolderDateAsc(folder)
+				SortOption.NAME_ASC -> videoDao.getVideoIdsByFolderNameAsc(folder)
+				SortOption.NAME_DESC -> videoDao.getVideoIdsByFolderNameDesc(folder)
+				SortOption.DURATION_DESC -> videoDao.getVideoIdsByFolderDurationDesc(folder)
+				SortOption.DURATION_ASC -> videoDao.getVideoIdsByFolderDurationAsc(folder)
+				SortOption.SIZE_DESC -> videoDao.getVideoIdsByFolderSizeDesc(folder)
+				SortOption.SIZE_ASC -> videoDao.getVideoIdsByFolderSizeAsc(folder)
+			}
 		}
 	}
 
 	override suspend fun getVideoById(id: Long): Video? = videoDao.getById(id)?.toDomain()
 
+	override suspend fun getVideosByIds(ids: List<Long>): List<Video> = withContext(Dispatchers.IO) {
+		if (ids.isEmpty()) return@withContext emptyList()
+		val entities = videoDao.getByIds(ids)
+		val entityMap = entities.associateBy { it.id }
+		ids.mapNotNull { entityMap[it]?.toDomain() }
+	}
+
+	override suspend fun getQueueWindow(
+		query: String,
+		sortOption: SortOption,
+		folder: String?,
+		anchorId: Long,
+		before: Int,
+		after: Int
+	): QueueWindow = withContext(Dispatchers.IO) {
+		val entity = videoDao.getById(anchorId)
+			?: return@withContext QueueWindow(listOf(anchorId), hasMoreBefore = false, hasMoreAfter = false)
+		val keys = QueueWindowSql.fromEntity(entity)
+		val q = query.trim()
+
+		val beforeRaw = if (before > 0) {
+			videoDao.queryIds(
+				QueueWindowSql.neighborsBefore(sortOption, folder, q, keys, before)
+			)
+		} else {
+			emptyList()
+		}
+		// SQL returns closest-first in reverse library order → reverse for playlist order.
+		val beforeIds = beforeRaw.asReversed()
+
+		val afterIds = if (after > 0) {
+			videoDao.queryIds(
+				QueueWindowSql.neighborsAfter(sortOption, folder, q, keys, after)
+			)
+		} else {
+			emptyList()
+		}
+
+		QueueWindow(
+			ids = beforeIds + anchorId + afterIds,
+			hasMoreBefore = beforeRaw.size >= before,
+			hasMoreAfter = afterIds.size >= after
+		)
+	}
+
+	override suspend fun getQueueNeighborsBefore(
+		query: String,
+		sortOption: SortOption,
+		folder: String?,
+		anchorId: Long,
+		limit: Int
+	): List<Long> = withContext(Dispatchers.IO) {
+		if (limit <= 0) return@withContext emptyList()
+		val entity = videoDao.getById(anchorId) ?: return@withContext emptyList()
+		val keys = QueueWindowSql.fromEntity(entity)
+		videoDao.queryIds(
+			QueueWindowSql.neighborsBefore(sortOption, folder, query.trim(), keys, limit)
+		).asReversed()
+	}
+
+	override suspend fun getQueueNeighborsAfter(
+		query: String,
+		sortOption: SortOption,
+		folder: String?,
+		anchorId: Long,
+		limit: Int
+	): List<Long> = withContext(Dispatchers.IO) {
+		if (limit <= 0) return@withContext emptyList()
+		val entity = videoDao.getById(anchorId) ?: return@withContext emptyList()
+		val keys = QueueWindowSql.fromEntity(entity)
+		videoDao.queryIds(
+			QueueWindowSql.neighborsAfter(sortOption, folder, query.trim(), keys, limit)
+		)
+	}
+
+	override suspend fun getQueueFirstIds(
+		query: String,
+		sortOption: SortOption,
+		folder: String?,
+		limit: Int
+	): List<Long> = withContext(Dispatchers.IO) {
+		if (limit <= 0) return@withContext emptyList()
+		videoDao.queryIds(
+			QueueWindowSql.firstPage(sortOption, folder, query.trim(), limit)
+		)
+	}
+
+	override suspend fun getQueueLastIds(
+		query: String,
+		sortOption: SortOption,
+		folder: String?,
+		limit: Int
+	): List<Long> = withContext(Dispatchers.IO) {
+		if (limit <= 0) return@withContext emptyList()
+		videoDao.queryIds(
+			QueueWindowSql.lastPage(sortOption, folder, query.trim(), limit)
+		).asReversed()
+	}
+
+	/**
+	 * Progressive MediaStore → Room sync:
+	 * each scanner batch is filtered/merged and upserted immediately so Paging
+	 * surfaces videos while the rest of the device is still being scanned.
+	 */
 	override suspend fun scanDeviceVideos(
 		onProgress: (suspend (indexed: Int, totalHint: Int) -> Unit)?
 	): Int = withContext(Dispatchers.IO) {
-		val scanned = scanner.scan()
-		if (scanned.isEmpty()) {
+		val settings = settingsRepository.settings.first()
+		val keepIds = HashSet<Long>()
+		var indexed = 0
+		var totalHint = 0
+		var receivedAny = false
+
+		scanner.scanBatches(BATCH_SIZE).collect { batch ->
+			receivedAny = true
+			totalHint = batch.totalHint
+
+			val ids = batch.videos.map { it.id }
+			val userState = if (ids.isEmpty()) {
+				emptyMap()
+			} else {
+				videoDao.getUserStatesForIds(ids).associateBy { it.id }
+			}
+
+			val merged = batch.videos.mapNotNull { fresh ->
+				if (!settings.showHiddenFiles && isHidden(fresh)) return@mapNotNull null
+				if (isBlacklisted(fresh, settings.blacklist)) return@mapNotNull null
+				val state = userState[fresh.id]
+				if (state != null) {
+					fresh.copy(
+						isFavorite = state.isFavorite,
+						lastPositionMs = state.lastPositionMs,
+						playCount = state.playCount
+					)
+				} else {
+					fresh
+				}
+			}
+
+			if (merged.isNotEmpty()) {
+				videoDao.upsertAll(merged)
+				keepIds.addAll(merged.map { it.id })
+				indexed += merged.size
+				onProgress?.invoke(indexed, totalHint.coerceAtLeast(indexed))
+			} else {
+				onProgress?.invoke(indexed, totalHint.coerceAtLeast(indexed))
+			}
+			yield()
+		}
+
+		if (!receivedAny || keepIds.isEmpty()) {
 			videoDao.clearAll()
 			onProgress?.invoke(0, 0)
 			return@withContext 0
 		}
 
-		val userState = videoDao.getUserStates().associateBy { it.id }
-		val settings = settingsRepository.settings.first()
-		val merged = scanned.mapNotNull { fresh ->
-			if (!settings.showHiddenFiles && isHidden(fresh)) return@mapNotNull null
-			if (isBlacklisted(fresh, settings.blacklist)) return@mapNotNull null
-			val state = userState[fresh.id]
-			if (state != null) {
-				fresh.copy(
-					isFavorite = state.isFavorite,
-					lastPositionMs = state.lastPositionMs,
-					playCount = state.playCount
-				)
-			} else {
-				fresh
-			}
-		}
-
-		var indexed = 0
-		val total = merged.size
-		merged.chunked(120).forEach { chunk ->
-			videoDao.upsertAll(chunk)
-			indexed += chunk.size
-			onProgress?.invoke(indexed, total)
-			yield()
-		}
-
-		val keepIds = merged.map { it.id }.toHashSet()
 		val staleIds = videoDao.getAllIds().filter { it !in keepIds }
 		staleIds.chunked(500).forEach { chunk ->
 			videoDao.deleteByIds(chunk)
 			yield()
 		}
 
+		onProgress?.invoke(indexed, indexed)
 		indexed
 	}
 
@@ -133,12 +292,13 @@ class VideoRepositoryImpl @Inject constructor(
 		videoDao.incrementPlayCount(videoId)
 	}
 
+	/** Path-based only — avoids per-file filesystem I/O during scan. */
 	private fun isHidden(video: VideoEntity): Boolean {
 		if (video.displayName.startsWith(".")) return true
 		val path = video.path ?: return false
 		return path.split('/', '\\').any { segment ->
 			segment.isNotEmpty() && segment.startsWith(".")
-		} || File(path).isHidden
+		}
 	}
 
 	private fun isBlacklisted(video: VideoEntity, blacklist: List<String>): Boolean {
@@ -148,5 +308,9 @@ class VideoRepositoryImpl @Inject constructor(
 				video.folderName.contains(entry, ignoreCase = true) ||
 				video.path?.contains(entry, ignoreCase = true) == true
 		}
+	}
+
+	private companion object {
+		const val BATCH_SIZE = 64
 	}
 }

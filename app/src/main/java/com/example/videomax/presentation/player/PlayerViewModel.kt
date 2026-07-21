@@ -22,6 +22,7 @@ import com.example.videomax.domain.usecase.ToggleFavoriteUseCase
 import com.example.videomax.domain.repository.VideoRepository
 import com.example.videomax.util.SubtitleHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +32,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import kotlin.math.abs
 
@@ -69,15 +73,11 @@ class PlayerViewModel @Inject constructor(
 	private val toggleFavoriteUseCase: ToggleFavoriteUseCase,
 	private val playbackQueue: PlaybackQueue,
 	private val videoRepository: VideoRepository,
-	observeSettings: ObserveSettingsUseCase
+	observeSettings: ObserveSettingsUseCase,
+	val player: ExoPlayer
 ) : AndroidViewModel(application) {
 
 	private val initialVideoId: Long = checkNotNull(savedStateHandle["videoId"])
-
-	val player: ExoPlayer = ExoPlayer.Builder(application).build().apply {
-		playWhenReady = true
-		repeatMode = Player.REPEAT_MODE_OFF
-	}
 
 	private val _uiState = MutableStateFlow(PlayerUiState())
 	val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
@@ -89,6 +89,7 @@ class PlayerViewModel @Inject constructor(
 	private var externalSubtitles: List<SubtitleTrack> = emptyList()
 	private var isSwitchingMedia = false
 	private var playCountRecordedFor: Long? = null
+	private val expandMutex = Mutex()
 
 	private val playerListener = object : Player.Listener {
 		override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -102,8 +103,60 @@ class PlayerViewModel @Inject constructor(
 					it.copy(durationMs = player.duration.coerceAtLeast(0L))
 				}
 			}
-			if (playbackState == Player.STATE_ENDED && !isSwitchingMedia) {
-				onVideoEnded()
+			if (playbackState == Player.STATE_ENDED) {
+				viewModelScope.launch {
+					persistProgress()
+					when (_uiState.value.repeatMode) {
+						QueueRepeatMode.ONE -> {
+							player.seekTo(0L)
+							player.play()
+						}
+						QueueRepeatMode.ALL -> playNextInternal()
+						QueueRepeatMode.OFF -> {
+							if (player.hasNextMediaItem() || playbackQueue.hasNext()) {
+								playNextInternal()
+							} else {
+								_uiState.update { it.copy(isPlaying = false, controlsVisible = true) }
+							}
+						}
+					}
+				}
+			}
+		}
+
+		override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+			val video = mediaItem?.localConfiguration?.tag as? Video ?: return
+
+			viewModelScope.launch {
+				persistProgress()
+			}
+
+			val newIndex = player.currentMediaItemIndex
+			playbackQueue.setIndex(newIndex)
+
+			val videoId = video.id
+			if (playCountRecordedFor != videoId) {
+				playCountRecordedFor = videoId
+				viewModelScope.launch {
+					runCatching { videoRepository.incrementPlayCount(videoId) }
+				}
+			}
+
+			_uiState.update {
+				it.copy(
+					video = video,
+					selectedSubtitleIndex = -1,
+					positionMs = 0L,
+					durationMs = video.durationMs,
+					controlsVisible = true
+				)
+			}
+
+			publishQueueState()
+			showControls()
+			viewModelScope.launch {
+				attachSidecarSubtitlesIfNeeded(video)
+				maybeExpandAroundPlayhead()
 			}
 		}
 
@@ -128,10 +181,8 @@ class PlayerViewModel @Inject constructor(
 			}
 		}
 		viewModelScope.launch {
-			loadVideo(
-				videoId = playbackQueue.currentId() ?: initialVideoId,
-				resumePosition = true
-			)
+			val currentId = playbackQueue.currentId() ?: initialVideoId
+			setupPlaylist(currentId)
 		}
 		progressJob = viewModelScope.launch {
 			while (isActive) {
@@ -152,107 +203,316 @@ class PlayerViewModel @Inject constructor(
 			it.copy(
 				queueIndex = playbackQueue.currentIndex(),
 				queueSize = playbackQueue.size(),
-				hasPrevious = playbackQueue.hasPrevious(),
-				hasNext = playbackQueue.hasNext() || it.repeatMode == QueueRepeatMode.ALL
+				hasPrevious = playbackQueue.hasPrevious() ||
+					(_uiState.value.repeatMode == QueueRepeatMode.ALL && playbackQueue.size() > 1),
+				hasNext = playbackQueue.hasNext() ||
+					it.repeatMode == QueueRepeatMode.ALL
 			)
 		}
 	}
 
-	private suspend fun loadVideo(videoId: Long, resumePosition: Boolean) {
-		val video = getVideoById(videoId) ?: return
-		val keepSpeed = _uiState.value.playbackSpeed.takeIf { it > 0f }
-			?: settings.defaultPlaybackSpeed
-		val keepOrientation = _uiState.value.orientation
-		val keepRepeat = _uiState.value.repeatMode
-		val keepBrightness = _uiState.value.brightness
-		val keepVolume = _uiState.value.volumeFraction
-		val keepLocked = _uiState.value.isLocked
-		val keepBrightnessOverride = _uiState.value.brightnessOverrideEnabled
+	/**
+	 * Starts the selected video immediately, then builds / expands the ExoPlayer
+	 * playlist without blocking first paint / first frame.
+	 */
+	private fun setupPlaylist(startVideoId: Long) {
+		viewModelScope.launch {
+			val startVideo = getVideoById(startVideoId)
+				?: videoRepository.getVideoById(startVideoId)
+				?: return@launch
 
-		externalSubtitles = SubtitleHelper.findExternalSubtitles(video.path)
-		_uiState.update {
-			it.copy(
-				video = video,
-				subtitleTracks = externalSubtitles,
-				selectedSubtitleIndex = -1,
-				playbackSpeed = keepSpeed,
-				orientation = keepOrientation,
-				repeatMode = keepRepeat,
-				brightness = keepBrightness,
-				volumeFraction = keepVolume,
-				brightnessOverrideEnabled = keepBrightnessOverride,
-				isLocked = keepLocked,
-				positionMs = 0L,
-				durationMs = video.durationMs,
-				controlsVisible = true
-			)
+			val resumePosition = if (settings.rememberPlaybackPosition && startVideo.lastPositionMs > 0) {
+				startVideo.lastPositionMs
+			} else {
+				0L
+			}
+
+			isSwitchingMedia = true
+			try {
+				player.setMediaItems(listOf(buildMediaItem(startVideo, includeSidecars = false)), 0, resumePosition)
+				player.prepare()
+				player.playbackParameters = PlaybackParameters(_uiState.value.playbackSpeed)
+				applyPlayerRepeatMode(_uiState.value.repeatMode)
+				player.playWhenReady = true
+			} finally {
+				isSwitchingMedia = false
+			}
+
+			externalSubtitles = withContext(Dispatchers.IO) {
+				SubtitleHelper.findExternalSubtitles(startVideo.path)
+			}
+			_uiState.update {
+				it.copy(
+					video = startVideo,
+					subtitleTracks = externalSubtitles,
+					selectedSubtitleIndex = -1,
+					durationMs = startVideo.durationMs,
+					controlsVisible = true
+				)
+			}
+			publishQueueState()
+			showControls()
+
+			if (externalSubtitles.isNotEmpty()) {
+				attachSidecarSubtitlesIfNeeded(startVideo)
+			}
+
+			if (playbackQueue.isLazy()) {
+				expandInitialLazyWindow(startVideoId)
+			} else {
+				loadEagerPlaylist(startVideoId, resumePosition)
+			}
 		}
-		publishQueueState()
+	}
 
-		if (playCountRecordedFor != videoId) {
-			playCountRecordedFor = videoId
-			runCatching { videoRepository.incrementPlayCount(videoId) }
+	/** Scan sidecar subs off the main thread; attach to the current MediaItem when found. */
+	private suspend fun attachSidecarSubtitlesIfNeeded(video: Video) {
+		val tracks = withContext(Dispatchers.IO) {
+			SubtitleHelper.findExternalSubtitles(video.path)
 		}
+		externalSubtitles = tracks
+		_uiState.update { it.copy(subtitleTracks = tracks) }
+		if (tracks.isEmpty()) return
+		if (player.currentMediaItem?.mediaId != video.id.toString()) return
 
-		val subtitleConfigs = externalSubtitles.map { track ->
+		val configs = tracks.map { track ->
 			MediaItem.SubtitleConfiguration.Builder(Uri.parse(track.uri))
 				.setMimeType(track.mimeType)
 				.setLabel(track.label)
 				.setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
 				.build()
 		}
-
-		val mediaItem = MediaItem.Builder()
-			.setUri(Uri.parse(video.uri))
-			.setMediaId(video.id.toString())
-			.setSubtitleConfigurations(subtitleConfigs)
-			.build()
-
+		val position = player.currentPosition
+		val playWhenReady = player.playWhenReady
+		val index = player.currentMediaItemIndex
+		if (index < 0) return
 		isSwitchingMedia = true
 		try {
-			player.setMediaItem(mediaItem)
-			player.prepare()
-			player.playbackParameters = PlaybackParameters(keepSpeed)
-			player.playWhenReady = true
-
-			if (resumePosition && settings.rememberPlaybackPosition && video.lastPositionMs > 0) {
-				player.seekTo(video.lastPositionMs)
-			} else {
-				player.seekTo(0L)
-			}
+			player.replaceMediaItem(
+				index,
+				MediaItem.Builder()
+					.setUri(Uri.parse(video.uri))
+					.setMediaId(video.id.toString())
+					.setSubtitleConfigurations(configs)
+					.setTag(video)
+					.build()
+			)
+			player.seekTo(index, position)
+			player.playWhenReady = playWhenReady
 		} finally {
 			isSwitchingMedia = false
 		}
-		showControls()
 	}
 
-	private fun onVideoEnded() {
-		viewModelScope.launch {
-			persistProgress()
-			when (_uiState.value.repeatMode) {
-				QueueRepeatMode.ONE -> {
-					player.seekTo(0L)
-					player.play()
-				}
-				QueueRepeatMode.ALL -> {
-					val nextId = if (playbackQueue.hasNext()) {
-						playbackQueue.moveToNext()
-					} else {
-						playbackQueue.moveToFirst()
-					}
-					if (nextId != null) loadVideo(nextId, resumePosition = false)
-				}
-				QueueRepeatMode.OFF -> {
-					if (playbackQueue.hasNext()) {
-						playNextInternal(resumePosition = false)
-					} else {
-						player.pause()
-						player.seekTo(0L)
-						_uiState.update { it.copy(isPlaying = false, controlsVisible = true) }
-					}
-				}
-			}
+	private suspend fun loadEagerPlaylist(startVideoId: Long, resumePosition: Long) {
+		val ids = playbackQueue.ids()
+		if (ids.size <= 1) {
+			publishQueueState()
+			return
 		}
+		val mediaItems = buildMediaItems(ids)
+		if (mediaItems.isEmpty()) return
+		val startIndex = mediaItems.indexOfFirst { it.mediaId == startVideoId.toString() }.coerceAtLeast(0)
+		val playWhenReady = player.playWhenReady
+		val position = player.currentPosition.takeIf { it > 0 } ?: resumePosition
+
+		isSwitchingMedia = true
+		try {
+			player.setMediaItems(mediaItems, startIndex, position)
+			player.prepare()
+			player.playbackParameters = PlaybackParameters(_uiState.value.playbackSpeed)
+			applyPlayerRepeatMode(_uiState.value.repeatMode)
+			player.playWhenReady = playWhenReady
+		} finally {
+			isSwitchingMedia = false
+		}
+		publishQueueState()
+	}
+
+	private suspend fun expandInitialLazyWindow(startVideoId: Long) {
+		expandMutex.withLock {
+			val ctx = playbackQueue.context() ?: return
+			val window = videoRepository.getQueueWindow(
+				query = ctx.query,
+				sortOption = ctx.sortOption,
+				folder = ctx.folder,
+				anchorId = startVideoId,
+				before = PlaybackQueue.WINDOW_BEFORE,
+				after = PlaybackQueue.WINDOW_AFTER
+			)
+			playbackQueue.applyWindow(
+				windowIds = window.ids,
+				startId = startVideoId,
+				moreBefore = window.hasMoreBefore,
+				moreAfter = window.hasMoreAfter
+			)
+
+			val mediaItems = buildMediaItems(window.ids)
+			if (mediaItems.isEmpty()) return
+			val startIndex = mediaItems.indexOfFirst { it.mediaId == startVideoId.toString() }.coerceAtLeast(0)
+			val position = player.currentPosition
+			val playWhenReady = player.playWhenReady
+
+			isSwitchingMedia = true
+			try {
+				player.setMediaItems(mediaItems, startIndex, position)
+				player.prepare()
+				player.playbackParameters = PlaybackParameters(_uiState.value.playbackSpeed)
+				applyPlayerRepeatMode(_uiState.value.repeatMode)
+				player.playWhenReady = playWhenReady
+			} finally {
+				isSwitchingMedia = false
+			}
+			publishQueueState()
+		}
+	}
+
+	private suspend fun maybeExpandAroundPlayhead() {
+		if (!playbackQueue.isLazy()) return
+		if (playbackQueue.needsExpandAfter()) expandAfterLocked()
+		if (playbackQueue.needsExpandBefore()) expandBeforeLocked()
+	}
+
+	private suspend fun expandAfterLocked() = expandMutex.withLock {
+		if (!playbackQueue.isLazy() || !playbackQueue.hasMoreAfter()) return
+		val ctx = playbackQueue.context() ?: return
+		val anchor = playbackQueue.lastId() ?: return
+		val more = videoRepository.getQueueNeighborsAfter(
+			query = ctx.query,
+			sortOption = ctx.sortOption,
+			folder = ctx.folder,
+			anchorId = anchor,
+			limit = PlaybackQueue.EXPAND_CHUNK
+		)
+		if (more.isEmpty()) {
+			playbackQueue.append(emptyList(), moreAfter = false)
+			publishQueueState()
+			return
+		}
+		val added = playbackQueue.append(more, moreAfter = more.size >= PlaybackQueue.EXPAND_CHUNK)
+		if (added > 0) {
+			val newIds = playbackQueue.ids().takeLast(added)
+			player.addMediaItems(buildMediaItems(newIds))
+		}
+		publishQueueState()
+	}
+
+	private suspend fun expandBeforeLocked() = expandMutex.withLock {
+		if (!playbackQueue.isLazy() || !playbackQueue.hasMoreBefore()) return
+		val ctx = playbackQueue.context() ?: return
+		val anchor = playbackQueue.firstId() ?: return
+		val more = videoRepository.getQueueNeighborsBefore(
+			query = ctx.query,
+			sortOption = ctx.sortOption,
+			folder = ctx.folder,
+			anchorId = anchor,
+			limit = PlaybackQueue.EXPAND_CHUNK
+		)
+		if (more.isEmpty()) {
+			playbackQueue.prepend(emptyList(), moreBefore = false)
+			publishQueueState()
+			return
+		}
+		val added = playbackQueue.prepend(more, moreBefore = more.size >= PlaybackQueue.EXPAND_CHUNK)
+		if (added > 0) {
+			val newIds = playbackQueue.ids().take(added)
+			player.addMediaItems(0, buildMediaItems(newIds))
+		}
+		publishQueueState()
+	}
+
+	/** Wrap Repeat All to the first page of the filtered library. */
+	private suspend fun wrapToLibraryStart() {
+		expandMutex.withLock {
+			val ctx = playbackQueue.context() ?: return
+			val limit = PlaybackQueue.WINDOW_BEFORE + PlaybackQueue.WINDOW_AFTER + 1
+			val firstIds = videoRepository.getQueueFirstIds(
+				query = ctx.query,
+				sortOption = ctx.sortOption,
+				folder = ctx.folder,
+				limit = limit
+			)
+			if (firstIds.isEmpty()) return
+			val startId = firstIds.first()
+			playbackQueue.applyWindow(
+				windowIds = firstIds,
+				startId = startId,
+				moreBefore = false,
+				moreAfter = firstIds.size >= limit
+			)
+			val mediaItems = buildMediaItems(firstIds)
+			isSwitchingMedia = true
+			try {
+				player.setMediaItems(mediaItems, 0, C.TIME_UNSET)
+				player.prepare()
+				player.playWhenReady = true
+			} finally {
+				isSwitchingMedia = false
+			}
+			publishQueueState()
+		}
+	}
+
+	/** Wrap Repeat All previous to the last page of the filtered library. */
+	private suspend fun wrapToLibraryEnd() {
+		expandMutex.withLock {
+			val ctx = playbackQueue.context() ?: return
+			val limit = PlaybackQueue.WINDOW_BEFORE + PlaybackQueue.WINDOW_AFTER + 1
+			val lastIds = videoRepository.getQueueLastIds(
+				query = ctx.query,
+				sortOption = ctx.sortOption,
+				folder = ctx.folder,
+				limit = limit
+			)
+			if (lastIds.isEmpty()) return
+			val startId = lastIds.last()
+			playbackQueue.applyWindow(
+				windowIds = lastIds,
+				startId = startId,
+				moreBefore = lastIds.size >= limit,
+				moreAfter = false
+			)
+			val mediaItems = buildMediaItems(lastIds)
+			val startIndex = mediaItems.lastIndex.coerceAtLeast(0)
+			isSwitchingMedia = true
+			try {
+				player.setMediaItems(mediaItems, startIndex, C.TIME_UNSET)
+				player.prepare()
+				player.playWhenReady = true
+			} finally {
+				isSwitchingMedia = false
+			}
+			publishQueueState()
+		}
+	}
+
+	private suspend fun buildMediaItems(ids: List<Long>): List<MediaItem> =
+		withContext(Dispatchers.IO) {
+			if (ids.isEmpty()) return@withContext emptyList()
+			val videos = videoRepository.getVideosByIds(ids)
+			val map = videos.associateBy { it.id }
+			// Skip filesystem subtitle scans here — attach lazily for the playing item only.
+			ids.mapNotNull { id -> map[id]?.let { buildMediaItem(it, includeSidecars = false) } }
+		}
+
+	private fun buildMediaItem(video: Video, includeSidecars: Boolean = false): MediaItem {
+		val subtitleConfigs = if (includeSidecars) {
+			SubtitleHelper.findExternalSubtitles(video.path).map { track ->
+				MediaItem.SubtitleConfiguration.Builder(Uri.parse(track.uri))
+					.setMimeType(track.mimeType)
+					.setLabel(track.label)
+					.setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+					.build()
+			}
+		} else {
+			emptyList()
+		}
+		return MediaItem.Builder()
+			.setUri(Uri.parse(video.uri))
+			.setMediaId(video.id.toString())
+			.setSubtitleConfigurations(subtitleConfigs)
+			.setTag(video)
+			.build()
 	}
 
 	fun playPrevious() {
@@ -263,44 +523,56 @@ class PlayerViewModel @Inject constructor(
 				showControls()
 				return@launch
 			}
-			if (!playbackQueue.hasPrevious()) {
-				player.seekTo(0L)
-				showControls()
-				return@launch
+			if (!player.hasPreviousMediaItem() && playbackQueue.hasMoreBefore()) {
+				expandBeforeLocked()
 			}
-			persistProgress()
-			val previousId = playbackQueue.moveToPrevious() ?: return@launch
-			loadVideo(previousId, resumePosition = false)
+			when {
+				player.hasPreviousMediaItem() -> player.seekToPreviousMediaItem()
+				_uiState.value.repeatMode == QueueRepeatMode.ALL -> {
+					if (playbackQueue.isLazy()) {
+						wrapToLibraryEnd()
+					} else if (player.mediaItemCount > 0) {
+						player.seekToDefaultPosition(player.mediaItemCount - 1)
+						player.play()
+					} else {
+						player.seekTo(0L)
+					}
+				}
+				else -> player.seekTo(0L)
+			}
+			showControls()
+			maybeExpandAroundPlayhead()
 		}
 	}
 
 	fun playNext() {
-		viewModelScope.launch {
-			persistProgress()
-			val state = _uiState.value
-			when {
-				playbackQueue.hasNext() -> playNextInternal(resumePosition = false)
-				state.repeatMode == QueueRepeatMode.ALL -> {
-					val firstId = playbackQueue.moveToFirst() ?: return@launch
-					loadVideo(firstId, resumePosition = false)
-				}
-				state.repeatMode == QueueRepeatMode.ONE -> {
-					player.seekTo(0L)
-					player.play()
-					showControls()
-				}
-				else -> {
-					// Last item, no wrap — restart current
-					player.seekTo(0L)
-					showControls()
-				}
-			}
-		}
+		viewModelScope.launch { playNextInternal() }
 	}
 
-	private suspend fun playNextInternal(resumePosition: Boolean) {
-		val nextId = playbackQueue.moveToNext() ?: return
-		loadVideo(nextId, resumePosition = resumePosition)
+	private suspend fun playNextInternal() {
+		if (!player.hasNextMediaItem() && playbackQueue.hasMoreAfter()) {
+			expandAfterLocked()
+		}
+		when {
+			player.hasNextMediaItem() -> player.seekToNextMediaItem()
+			_uiState.value.repeatMode == QueueRepeatMode.ALL -> {
+				if (playbackQueue.isLazy()) {
+					wrapToLibraryStart()
+				} else {
+					player.seekToDefaultPosition(0)
+					player.play()
+				}
+			}
+			_uiState.value.repeatMode == QueueRepeatMode.ONE -> {
+				player.seekTo(0L)
+				player.play()
+			}
+			else -> {
+				player.seekTo(0L)
+			}
+		}
+		showControls()
+		maybeExpandAroundPlayhead()
 	}
 
 	fun cycleRepeatMode() {
@@ -308,8 +580,22 @@ class PlayerViewModel @Inject constructor(
 		val current = _uiState.value.repeatMode
 		val next = modes[(modes.indexOf(current) + 1) % modes.size]
 		_uiState.update { it.copy(repeatMode = next) }
+		applyPlayerRepeatMode(next)
 		publishQueueState()
 		showControls()
+	}
+
+	/**
+	 * For lazy queues, ExoPlayer ALL would only loop the loaded window — handle wrap ourselves.
+	 * ONE still uses ExoPlayer's native repeat.
+	 */
+	private fun applyPlayerRepeatMode(mode: QueueRepeatMode) {
+		player.repeatMode = when {
+			mode == QueueRepeatMode.ONE -> Player.REPEAT_MODE_ONE
+			playbackQueue.isLazy() -> Player.REPEAT_MODE_OFF
+			mode == QueueRepeatMode.ALL -> Player.REPEAT_MODE_ALL
+			else -> Player.REPEAT_MODE_OFF
+		}
 	}
 
 	fun cycleOrientation() {
@@ -444,18 +730,19 @@ class PlayerViewModel @Inject constructor(
 				.setLabel(it.label)
 				.build()
 		}
-		val position = player.currentPosition
 		val playWhenReady = player.playWhenReady
 		val speed = _uiState.value.playbackSpeed
 		isSwitchingMedia = true
-		player.setMediaItem(
-			MediaItem.Builder()
-				.setUri(Uri.parse(video.uri))
-				.setMediaId(video.id.toString())
-				.setSubtitleConfigurations(configs)
-				.build(),
-			position
-		)
+
+		val newMediaItem = MediaItem.Builder()
+			.setUri(Uri.parse(video.uri))
+			.setMediaId(video.id.toString())
+			.setSubtitleConfigurations(configs)
+			.setTag(video)
+			.build()
+
+		val currentIndex = player.currentMediaItemIndex
+		player.replaceMediaItem(currentIndex, newMediaItem)
 		player.prepare()
 		player.playbackParameters = PlaybackParameters(speed)
 		player.playWhenReady = playWhenReady
@@ -511,7 +798,8 @@ class PlayerViewModel @Inject constructor(
 		hideControlsJob?.cancel()
 		gestureHintJob?.cancel()
 		player.removeListener(playerListener)
-		player.release()
+		player.stop()
+		player.clearMediaItems()
 		super.onCleared()
 	}
 }

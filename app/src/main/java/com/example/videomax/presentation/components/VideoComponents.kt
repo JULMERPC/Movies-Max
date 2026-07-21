@@ -21,113 +21,155 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import coil.decode.VideoFrameDecoder
 import coil.request.ImageRequest
 import coil.request.videoFrameMillis
-import androidx.compose.ui.platform.LocalContext
+import coil.size.Precision
+import coil.size.Scale
 import com.example.videomax.domain.model.Video
 import com.example.videomax.util.Formatters
 
+/**
+ * Compact grid cell: thumbnail + duration only (no card chrome / press animations).
+ */
 @Composable
 fun VideoGridItem(
 	video: Video,
 	onClick: () -> Unit,
 	onFavoriteClick: () -> Unit,
 	onLongClick: (() -> Unit)? = null,
+	showOnlyThumbnail: Boolean = false,
 	modifier: Modifier = Modifier
 ) {
-	Card(
+	if (showOnlyThumbnail) {
+		Box(
+			modifier = modifier
+				.fillMaxWidth()
+				.aspectRatio(16f / 9f)
+				.clip(RoundedCornerShape(8.dp))
+				.background(MaterialTheme.colorScheme.surfaceVariant)
+				.clickable(onClick = onClick)
+		) {
+			VideoThumbnail(
+				uri = video.uri,
+				cacheKey = "g_${video.id}",
+				lightweight = true,
+				modifier = Modifier.fillMaxSize()
+			)
+			Text(
+				text = Formatters.formatDuration(video.durationMs),
+				style = MaterialTheme.typography.labelSmall,
+				color = Color.White,
+				modifier = Modifier
+					.align(Alignment.BottomEnd)
+					.padding(4.dp)
+					.background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(4.dp))
+					.padding(horizontal = 4.dp, vertical = 1.dp)
+			)
+			if (video.lastPositionMs > 0 && video.durationMs > 0) {
+				LinearProgressIndicator(
+					progress = { (video.lastPositionMs.toFloat() / video.durationMs).coerceIn(0f, 1f) },
+					modifier = Modifier
+						.fillMaxWidth()
+						.align(Alignment.BottomCenter)
+						.height(2.dp),
+					color = MaterialTheme.colorScheme.primary,
+					trackColor = Color.Transparent
+				)
+			}
+		}
+		return
+	}
+
+	Column(
 		modifier = modifier
 			.fillMaxWidth()
-			.clickable(onClick = onClick),
-		shape = RoundedCornerShape(18.dp),
-		colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
-		elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+			.clip(RoundedCornerShape(12.dp))
+			.clickable(onClick = onClick)
 	) {
-		Column {
+		Box(
+			modifier = Modifier
+				.fillMaxWidth()
+				.aspectRatio(16f / 9f)
+				.clip(RoundedCornerShape(12.dp))
+		) {
+			VideoThumbnail(
+				uri = video.uri,
+				cacheKey = "c_${video.id}",
+				lightweight = true,
+				modifier = Modifier.fillMaxSize()
+			)
 			Box(
 				modifier = Modifier
-					.fillMaxWidth()
-					.aspectRatio(16f / 9f)
-			) {
-				VideoThumbnail(
-					uri = video.uri,
-					modifier = Modifier.fillMaxSize()
-				)
-				Box(
-					modifier = Modifier
-						.fillMaxSize()
-						.background(
-							Brush.verticalGradient(
-								listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f))
-							)
+					.fillMaxSize()
+					.background(
+						Brush.verticalGradient(
+							listOf(Color.Transparent, Color.Black.copy(alpha = 0.5f))
 						)
+					)
+			)
+			Text(
+				text = Formatters.formatDuration(video.durationMs),
+				style = MaterialTheme.typography.labelMedium,
+				color = Color.White,
+				modifier = Modifier
+					.align(Alignment.BottomEnd)
+					.padding(8.dp)
+					.background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(6.dp))
+					.padding(horizontal = 6.dp, vertical = 2.dp)
+			)
+			IconButton(
+				onClick = onFavoriteClick,
+				modifier = Modifier.align(Alignment.TopEnd)
+			) {
+				Icon(
+					imageVector = if (video.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+					contentDescription = "Favorite",
+					tint = if (video.isFavorite) MaterialTheme.colorScheme.secondary else Color.White
 				)
-				Text(
-					text = Formatters.formatDuration(video.durationMs),
-					style = MaterialTheme.typography.labelLarge,
-					color = Color.White,
+			}
+			if (video.lastPositionMs > 0 && video.durationMs > 0) {
+				LinearProgressIndicator(
+					progress = { (video.lastPositionMs.toFloat() / video.durationMs).coerceIn(0f, 1f) },
 					modifier = Modifier
-						.align(Alignment.BottomEnd)
-						.padding(8.dp)
-						.background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(6.dp))
-						.padding(horizontal = 6.dp, vertical = 2.dp)
-				)
-				IconButton(
-					onClick = onFavoriteClick,
-					modifier = Modifier.align(Alignment.TopEnd)
-				) {
-					Icon(
-						imageVector = if (video.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-						contentDescription = "Favorite",
-						tint = if (video.isFavorite) MaterialTheme.colorScheme.secondary else Color.White
-					)
-				}
-				if (video.lastPositionMs > 0 && video.durationMs > 0) {
-					LinearProgressIndicator(
-						progress = { (video.lastPositionMs.toFloat() / video.durationMs).coerceIn(0f, 1f) },
-						modifier = Modifier
-							.fillMaxWidth()
-							.align(Alignment.BottomCenter)
-							.height(3.dp),
-						color = MaterialTheme.colorScheme.primary,
-						trackColor = Color.White.copy(alpha = 0.25f)
-					)
-				}
-			}
-			Column(modifier = Modifier.padding(12.dp)) {
-				Text(
-					text = video.displayName,
-					style = MaterialTheme.typography.titleMedium,
-					maxLines = 2,
-					overflow = TextOverflow.Ellipsis
-				)
-				Spacer(modifier = Modifier.height(4.dp))
-				Text(
-					text = "${video.folderName} · ${Formatters.formatFileSize(video.sizeBytes)}",
-					style = MaterialTheme.typography.bodyMedium,
-					color = MaterialTheme.colorScheme.onSurfaceVariant,
-					maxLines = 1,
-					overflow = TextOverflow.Ellipsis
+						.fillMaxWidth()
+						.align(Alignment.BottomCenter)
+						.height(3.dp),
+					color = MaterialTheme.colorScheme.primary,
+					trackColor = Color.White.copy(alpha = 0.25f)
 				)
 			}
+		}
+		Column(modifier = Modifier.padding(top = 8.dp, start = 2.dp, end = 2.dp, bottom = 4.dp)) {
+			Text(
+				text = video.displayName,
+				style = MaterialTheme.typography.titleSmall,
+				maxLines = 2,
+				overflow = TextOverflow.Ellipsis
+			)
+			Text(
+				text = "${video.folderName} · ${Formatters.formatFileSize(video.sizeBytes)}",
+				style = MaterialTheme.typography.bodySmall,
+				color = MaterialTheme.colorScheme.onSurfaceVariant,
+				maxLines = 1,
+				overflow = TextOverflow.Ellipsis
+			)
 		}
 	}
 }
@@ -148,15 +190,21 @@ fun VideoListItem(
 	) {
 		Box(
 			modifier = Modifier
-				.width(128.dp)
+				.width(120.dp)
 				.aspectRatio(16f / 9f)
-				.clip(RoundedCornerShape(12.dp))
+				.clip(RoundedCornerShape(8.dp))
+				.background(MaterialTheme.colorScheme.surfaceVariant)
 		) {
-			VideoThumbnail(uri = video.uri, modifier = Modifier.fillMaxSize())
+			VideoThumbnail(
+				uri = video.uri,
+				cacheKey = "l_${video.id}",
+				lightweight = true,
+				modifier = Modifier.fillMaxSize()
+			)
 			Icon(
 				imageVector = Icons.Default.PlayArrow,
 				contentDescription = null,
-				tint = Color.White,
+				tint = Color.White.copy(alpha = 0.9f),
 				modifier = Modifier
 					.align(Alignment.Center)
 					.size(28.dp)
@@ -186,24 +234,39 @@ fun VideoListItem(
 	}
 }
 
+/**
+ * @param lightweight smaller decode target + first frame — for grids/lists to avoid UI stalls.
+ */
 @Composable
 fun VideoThumbnail(
 	uri: String,
-	modifier: Modifier = Modifier
+	modifier: Modifier = Modifier,
+	cacheKey: String? = null,
+	lightweight: Boolean = false
 ) {
 	val context = LocalContext.current
-	AsyncImage(
-		model = ImageRequest.Builder(context)
+	val model = remember(uri, cacheKey, lightweight) {
+		ImageRequest.Builder(context)
 			.data(Uri.parse(uri))
-			.decoderFactory(VideoFrameDecoder.Factory())
-			.videoFrameMillis(1_000)
-			.crossfade(true)
-			.build(),
+			.memoryCacheKey(cacheKey ?: uri)
+			.diskCacheKey(cacheKey ?: uri)
+			// Frame 0 is much cheaper than seeking to 1s on every cell.
+			.videoFrameMillis(0)
+			.crossfade(false)
+			.apply {
+				if (lightweight) {
+					size(320, 180)
+					precision(Precision.INEXACT)
+					scale(Scale.FILL)
+				}
+			}
+			.build()
+	}
+	AsyncImage(
+		model = model,
 		contentDescription = null,
 		contentScale = ContentScale.Crop,
-		modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant),
-		error = null,
-		placeholder = null
+		modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant)
 	)
 }
 

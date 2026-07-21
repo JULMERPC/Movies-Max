@@ -7,20 +7,29 @@ import android.provider.MediaStore
 import com.example.videomax.data.local.db.entity.VideoEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.yield
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Scans device videos via MediaStore. Runs off the main thread.
+ * Scans device videos via MediaStore in incremental batches on [Dispatchers.IO].
+ * Emits each batch as soon as it is ready so Room/UI can update progressively.
  */
 @Singleton
 class MediaStoreVideoScanner @Inject constructor(
 	@param:ApplicationContext private val context: Context
 ) {
 
-	suspend fun scan(): List<VideoEntity> = withContext(Dispatchers.IO) {
+	/**
+	 * Streams MediaStore rows in batches. Never accumulates the full library in memory.
+	 *
+	 * @param batchSize number of videos per emission (typical: 48–80)
+	 */
+	fun scanBatches(batchSize: Int = 64): Flow<ScanBatch> = flow {
 		val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
 			MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
 		} else {
@@ -42,7 +51,6 @@ class MediaStoreVideoScanner @Inject constructor(
 		)
 
 		val sortOrder = "${MediaStore.Video.Media.DATE_ADDED} DESC"
-		val results = mutableListOf<VideoEntity>()
 
 		context.contentResolver.query(
 			collection,
@@ -63,6 +71,9 @@ class MediaStoreVideoScanner @Inject constructor(
 			val dataCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATA)
 			val bucketCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.BUCKET_DISPLAY_NAME)
 
+			val totalHint = cursor.count.coerceAtLeast(0)
+			val batch = ArrayList<VideoEntity>(batchSize)
+
 			while (cursor.moveToNext()) {
 				val id = cursor.getLong(idCol)
 				val uri = ContentUris.withAppendedId(collection, id).toString()
@@ -70,8 +81,9 @@ class MediaStoreVideoScanner @Inject constructor(
 				val folder = cursor.getString(bucketCol)
 					?: path?.let { File(it).parentFile?.name }
 					?: "Internal"
+				val mime = cursor.getString(mimeCol)
 
-				results += VideoEntity(
+				batch += VideoEntity(
 					id = id,
 					uri = uri,
 					displayName = cursor.getString(nameCol) ?: "Video $id",
@@ -80,17 +92,25 @@ class MediaStoreVideoScanner @Inject constructor(
 					sizeBytes = cursor.getLong(sizeCol).coerceAtLeast(0L),
 					width = cursor.getInt(widthCol).coerceAtLeast(0),
 					height = cursor.getInt(heightCol).coerceAtLeast(0),
-					mimeType = cursor.getString(mimeCol) ?: "video/*",
+					mimeType = mime ?: "video/*",
 					dateAdded = cursor.getLong(addedCol) * 1000L,
 					dateModified = cursor.getLong(modifiedCol) * 1000L,
 					folderName = folder,
-					codec = guessCodec(cursor.getString(mimeCol))
+					codec = guessCodec(mime)
 				)
+
+				if (batch.size >= batchSize) {
+					emit(ScanBatch(videos = batch.toList(), totalHint = totalHint))
+					batch.clear()
+					yield()
+				}
+			}
+
+			if (batch.isNotEmpty()) {
+				emit(ScanBatch(videos = batch.toList(), totalHint = totalHint))
 			}
 		}
-
-		results
-	}
+	}.flowOn(Dispatchers.IO)
 
 	private fun guessCodec(mimeType: String?): String? = when {
 		mimeType == null -> null
@@ -103,3 +123,8 @@ class MediaStoreVideoScanner @Inject constructor(
 		else -> mimeType.substringAfter('/', mimeType).uppercase()
 	}
 }
+
+data class ScanBatch(
+	val videos: List<VideoEntity>,
+	val totalHint: Int
+)

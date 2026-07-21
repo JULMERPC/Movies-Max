@@ -30,6 +30,13 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import com.example.videomax.domain.model.ThemeMode
+
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
@@ -65,8 +72,31 @@ class MainActivity : ComponentActivity() {
 				applyLanguage(settings.language)
 			}
 
+			val isDark = when (settings.themeMode) {
+				ThemeMode.LIGHT -> false
+				ThemeMode.DARK -> true
+				ThemeMode.SYSTEM -> isSystemInDarkTheme()
+			}
+			val backgroundGradient = Brush.verticalGradient(
+				colors = if (isDark) {
+					listOf(
+						Color(0xFF0C1919), // Deep dark teal
+						Color(0xFF050A0A)  // Solid near black
+					)
+				} else {
+					listOf(
+						Color(0xFFD9EFEF), // Beautiful soft teal
+						Color(0xFFF0FDFD)  // Crisp white/teal mint
+					)
+				}
+			)
+
 			VideoPlayerProTheme(themeMode = settings.themeMode) {
-				Surface(modifier = Modifier.fillMaxSize()) {
+				Box(
+					modifier = Modifier
+						.fillMaxSize()
+						.background(backgroundGradient)
+				) {
 					MediaPermissionGate(
 						hasPermission = hasPermission,
 						onRequestPermission = {

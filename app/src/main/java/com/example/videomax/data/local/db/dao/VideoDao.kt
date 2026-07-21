@@ -5,6 +5,8 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.RawQuery
+import androidx.sqlite.db.SupportSQLiteQuery
 import com.example.videomax.data.local.db.entity.VideoEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -30,73 +32,111 @@ interface VideoDao {
 	@Query("SELECT id, isFavorite, lastPositionMs, playCount FROM videos")
 	suspend fun getUserStates(): List<VideoUserState>
 
-	@Query(
-		"""
-		SELECT * FROM videos
-		WHERE (:query = '' OR displayName LIKE '%' || :query || '%' OR folderName LIKE '%' || :query || '%')
-		ORDER BY
-			CASE WHEN :sort = 'DATE_DESC' THEN dateAdded END DESC,
-			CASE WHEN :sort = 'DATE_ASC' THEN dateAdded END ASC,
-			CASE WHEN :sort = 'NAME_ASC' THEN displayName COLLATE NOCASE END ASC,
-			CASE WHEN :sort = 'NAME_DESC' THEN displayName COLLATE NOCASE END DESC,
-			CASE WHEN :sort = 'DURATION_DESC' THEN durationMs END DESC,
-			CASE WHEN :sort = 'DURATION_ASC' THEN durationMs END ASC,
-			CASE WHEN :sort = 'SIZE_DESC' THEN sizeBytes END DESC,
-			CASE WHEN :sort = 'SIZE_ASC' THEN sizeBytes END ASC
-		"""
-	)
-	fun pagingVideos(query: String, sort: String): PagingSource<Int, VideoEntity>
+	@Query("SELECT id, isFavorite, lastPositionMs, playCount FROM videos WHERE id IN (:ids)")
+	suspend fun getUserStatesForIds(ids: List<Long>): List<VideoUserState>
 
-	@Query(
-		"""
-		SELECT * FROM videos
-		WHERE folderName = :folder
-		ORDER BY
-			CASE WHEN :sort = 'DATE_DESC' THEN dateAdded END DESC,
-			CASE WHEN :sort = 'DATE_ASC' THEN dateAdded END ASC,
-			CASE WHEN :sort = 'NAME_ASC' THEN displayName COLLATE NOCASE END ASC,
-			CASE WHEN :sort = 'NAME_DESC' THEN displayName COLLATE NOCASE END DESC,
-			CASE WHEN :sort = 'DURATION_DESC' THEN durationMs END DESC,
-			CASE WHEN :sort = 'DURATION_ASC' THEN durationMs END ASC,
-			CASE WHEN :sort = 'SIZE_DESC' THEN sizeBytes END DESC,
-			CASE WHEN :sort = 'SIZE_ASC' THEN sizeBytes END ASC
-		"""
-	)
-	fun pagingByFolder(folder: String, sort: String): PagingSource<Int, VideoEntity>
+	@Query("SELECT * FROM videos WHERE id IN (:ids)")
+	suspend fun getByIds(ids: List<Long>): List<VideoEntity>
 
-	@Query(
-		"""
-		SELECT id FROM videos
-		WHERE (:query = '' OR displayName LIKE '%' || :query || '%' OR folderName LIKE '%' || :query || '%')
-		ORDER BY
-			CASE WHEN :sort = 'DATE_DESC' THEN dateAdded END DESC,
-			CASE WHEN :sort = 'DATE_ASC' THEN dateAdded END ASC,
-			CASE WHEN :sort = 'NAME_ASC' THEN displayName COLLATE NOCASE END ASC,
-			CASE WHEN :sort = 'NAME_DESC' THEN displayName COLLATE NOCASE END DESC,
-			CASE WHEN :sort = 'DURATION_DESC' THEN durationMs END DESC,
-			CASE WHEN :sort = 'DURATION_ASC' THEN durationMs END ASC,
-			CASE WHEN :sort = 'SIZE_DESC' THEN sizeBytes END DESC,
-			CASE WHEN :sort = 'SIZE_ASC' THEN sizeBytes END ASC
-		"""
-	)
-	suspend fun getVideoIds(query: String, sort: String): List<Long>
+	// --- pagingVideos ---
+	@Query("SELECT * FROM videos WHERE (:query = '' OR displayName LIKE '%' || :query || '%' OR folderName LIKE '%' || :query || '%') ORDER BY dateAdded DESC")
+	fun pagingVideosDateDesc(query: String): PagingSource<Int, VideoEntity>
 
-	@Query(
-		"""
-		SELECT id FROM videos
-		WHERE folderName = :folder
-		ORDER BY
-			CASE WHEN :sort = 'DATE_DESC' THEN dateAdded END DESC,
-			CASE WHEN :sort = 'DATE_ASC' THEN dateAdded END ASC,
-			CASE WHEN :sort = 'NAME_ASC' THEN displayName COLLATE NOCASE END ASC,
-			CASE WHEN :sort = 'NAME_DESC' THEN displayName COLLATE NOCASE END DESC,
-			CASE WHEN :sort = 'DURATION_DESC' THEN durationMs END DESC,
-			CASE WHEN :sort = 'DURATION_ASC' THEN durationMs END ASC,
-			CASE WHEN :sort = 'SIZE_DESC' THEN sizeBytes END DESC,
-			CASE WHEN :sort = 'SIZE_ASC' THEN sizeBytes END ASC
-		"""
-	)
-	suspend fun getVideoIdsByFolder(folder: String, sort: String): List<Long>
+	@Query("SELECT * FROM videos WHERE (:query = '' OR displayName LIKE '%' || :query || '%' OR folderName LIKE '%' || :query || '%') ORDER BY dateAdded ASC")
+	fun pagingVideosDateAsc(query: String): PagingSource<Int, VideoEntity>
+
+	@Query("SELECT * FROM videos WHERE (:query = '' OR displayName LIKE '%' || :query || '%' OR folderName LIKE '%' || :query || '%') ORDER BY displayName COLLATE NOCASE ASC")
+	fun pagingVideosNameAsc(query: String): PagingSource<Int, VideoEntity>
+
+	@Query("SELECT * FROM videos WHERE (:query = '' OR displayName LIKE '%' || :query || '%' OR folderName LIKE '%' || :query || '%') ORDER BY displayName COLLATE NOCASE DESC")
+	fun pagingVideosNameDesc(query: String): PagingSource<Int, VideoEntity>
+
+	@Query("SELECT * FROM videos WHERE (:query = '' OR displayName LIKE '%' || :query || '%' OR folderName LIKE '%' || :query || '%') ORDER BY durationMs DESC")
+	fun pagingVideosDurationDesc(query: String): PagingSource<Int, VideoEntity>
+
+	@Query("SELECT * FROM videos WHERE (:query = '' OR displayName LIKE '%' || :query || '%' OR folderName LIKE '%' || :query || '%') ORDER BY durationMs ASC")
+	fun pagingVideosDurationAsc(query: String): PagingSource<Int, VideoEntity>
+
+	@Query("SELECT * FROM videos WHERE (:query = '' OR displayName LIKE '%' || :query || '%' OR folderName LIKE '%' || :query || '%') ORDER BY sizeBytes DESC")
+	fun pagingVideosSizeDesc(query: String): PagingSource<Int, VideoEntity>
+
+	@Query("SELECT * FROM videos WHERE (:query = '' OR displayName LIKE '%' || :query || '%' OR folderName LIKE '%' || :query || '%') ORDER BY sizeBytes ASC")
+	fun pagingVideosSizeAsc(query: String): PagingSource<Int, VideoEntity>
+
+	// --- pagingByFolder ---
+	@Query("SELECT * FROM videos WHERE folderName = :folder ORDER BY dateAdded DESC")
+	fun pagingByFolderDateDesc(folder: String): PagingSource<Int, VideoEntity>
+
+	@Query("SELECT * FROM videos WHERE folderName = :folder ORDER BY dateAdded ASC")
+	fun pagingByFolderDateAsc(folder: String): PagingSource<Int, VideoEntity>
+
+	@Query("SELECT * FROM videos WHERE folderName = :folder ORDER BY displayName COLLATE NOCASE ASC")
+	fun pagingByFolderNameAsc(folder: String): PagingSource<Int, VideoEntity>
+
+	@Query("SELECT * FROM videos WHERE folderName = :folder ORDER BY displayName COLLATE NOCASE DESC")
+	fun pagingByFolderNameDesc(folder: String): PagingSource<Int, VideoEntity>
+
+	@Query("SELECT * FROM videos WHERE folderName = :folder ORDER BY durationMs DESC")
+	fun pagingByFolderDurationDesc(folder: String): PagingSource<Int, VideoEntity>
+
+	@Query("SELECT * FROM videos WHERE folderName = :folder ORDER BY durationMs ASC")
+	fun pagingByFolderDurationAsc(folder: String): PagingSource<Int, VideoEntity>
+
+	@Query("SELECT * FROM videos WHERE folderName = :folder ORDER BY sizeBytes DESC")
+	fun pagingByFolderSizeDesc(folder: String): PagingSource<Int, VideoEntity>
+
+	@Query("SELECT * FROM videos WHERE folderName = :folder ORDER BY sizeBytes ASC")
+	fun pagingByFolderSizeAsc(folder: String): PagingSource<Int, VideoEntity>
+
+	// --- getVideoIds ---
+	@Query("SELECT id FROM videos WHERE (:query = '' OR displayName LIKE '%' || :query || '%' OR folderName LIKE '%' || :query || '%') ORDER BY dateAdded DESC")
+	suspend fun getVideoIdsDateDesc(query: String): List<Long>
+
+	@Query("SELECT id FROM videos WHERE (:query = '' OR displayName LIKE '%' || :query || '%' OR folderName LIKE '%' || :query || '%') ORDER BY dateAdded ASC")
+	suspend fun getVideoIdsDateAsc(query: String): List<Long>
+
+	@Query("SELECT id FROM videos WHERE (:query = '' OR displayName LIKE '%' || :query || '%' OR folderName LIKE '%' || :query || '%') ORDER BY displayName COLLATE NOCASE ASC")
+	suspend fun getVideoIdsNameAsc(query: String): List<Long>
+
+	@Query("SELECT id FROM videos WHERE (:query = '' OR displayName LIKE '%' || :query || '%' OR folderName LIKE '%' || :query || '%') ORDER BY displayName COLLATE NOCASE DESC")
+	suspend fun getVideoIdsNameDesc(query: String): List<Long>
+
+	@Query("SELECT id FROM videos WHERE (:query = '' OR displayName LIKE '%' || :query || '%' OR folderName LIKE '%' || :query || '%') ORDER BY durationMs DESC")
+	suspend fun getVideoIdsDurationDesc(query: String): List<Long>
+
+	@Query("SELECT id FROM videos WHERE (:query = '' OR displayName LIKE '%' || :query || '%' OR folderName LIKE '%' || :query || '%') ORDER BY durationMs ASC")
+	suspend fun getVideoIdsDurationAsc(query: String): List<Long>
+
+	@Query("SELECT id FROM videos WHERE (:query = '' OR displayName LIKE '%' || :query || '%' OR folderName LIKE '%' || :query || '%') ORDER BY sizeBytes DESC")
+	suspend fun getVideoIdsSizeDesc(query: String): List<Long>
+
+	@Query("SELECT id FROM videos WHERE (:query = '' OR displayName LIKE '%' || :query || '%' OR folderName LIKE '%' || :query || '%') ORDER BY sizeBytes ASC")
+	suspend fun getVideoIdsSizeAsc(query: String): List<Long>
+
+	// --- getVideoIdsByFolder ---
+	@Query("SELECT id FROM videos WHERE folderName = :folder ORDER BY dateAdded DESC")
+	suspend fun getVideoIdsByFolderDateDesc(folder: String): List<Long>
+
+	@Query("SELECT id FROM videos WHERE folderName = :folder ORDER BY dateAdded ASC")
+	suspend fun getVideoIdsByFolderDateAsc(folder: String): List<Long>
+
+	@Query("SELECT id FROM videos WHERE folderName = :folder ORDER BY displayName COLLATE NOCASE ASC")
+	suspend fun getVideoIdsByFolderNameAsc(folder: String): List<Long>
+
+	@Query("SELECT id FROM videos WHERE folderName = :folder ORDER BY displayName COLLATE NOCASE DESC")
+	suspend fun getVideoIdsByFolderNameDesc(folder: String): List<Long>
+
+	@Query("SELECT id FROM videos WHERE folderName = :folder ORDER BY durationMs DESC")
+	suspend fun getVideoIdsByFolderDurationDesc(folder: String): List<Long>
+
+	@Query("SELECT id FROM videos WHERE folderName = :folder ORDER BY durationMs ASC")
+	suspend fun getVideoIdsByFolderDurationAsc(folder: String): List<Long>
+
+	@Query("SELECT id FROM videos WHERE folderName = :folder ORDER BY sizeBytes DESC")
+	suspend fun getVideoIdsByFolderSizeDesc(folder: String): List<Long>
+
+	@Query("SELECT id FROM videos WHERE folderName = :folder ORDER BY sizeBytes ASC")
+	suspend fun getVideoIdsByFolderSizeAsc(folder: String): List<Long>
 
 	@Query("SELECT DISTINCT folderName FROM videos ORDER BY folderName COLLATE NOCASE ASC")
 	fun observeFolders(): Flow<List<String>>
@@ -136,4 +176,8 @@ interface VideoDao {
 
 	@Query("DELETE FROM videos WHERE id IN (:ids)")
 	suspend fun deleteByIds(ids: List<Long>)
+
+	/** Keyset / page queries for lazy playback queues. */
+	@RawQuery
+	suspend fun queryIds(query: SupportSQLiteQuery): List<Long>
 }

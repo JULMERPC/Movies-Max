@@ -1,6 +1,7 @@
 package com.example.videomax.di
 
 import android.content.Context
+import androidx.media3.exoplayer.ExoPlayer
 import androidx.room.Room
 import com.example.videomax.data.local.db.VideoDatabase
 import com.example.videomax.data.local.db.dao.HistoryDao
@@ -71,4 +72,17 @@ abstract class RepositoryModule {
 	@Binds
 	@Singleton
 	abstract fun bindSettingsRepository(impl: SettingsRepositoryImpl): SettingsRepository
+}
+
+@Module
+@InstallIn(SingletonComponent::class)
+object PlayerModule {
+
+	@Provides
+	@Singleton
+	fun provideExoPlayer(@ApplicationContext context: Context): ExoPlayer =
+		ExoPlayer.Builder(context).build().apply {
+			playWhenReady = true
+			repeatMode = androidx.media3.common.Player.REPEAT_MODE_OFF
+		}
 }

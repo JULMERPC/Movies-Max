@@ -13,6 +13,7 @@ import com.example.videomax.domain.usecase.PagingVideosUseCase
 import com.example.videomax.domain.usecase.ScanVideosUseCase
 import com.example.videomax.domain.usecase.ToggleFavoriteUseCase
 import com.example.videomax.presentation.player.PlaybackQueue
+import com.example.videomax.presentation.player.PlaybackQueueContext
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -20,6 +21,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -58,7 +61,12 @@ class LibraryViewModel @Inject constructor(
 	private val selectedFolder = MutableStateFlow<String?>(null)
 	private val message = MutableStateFlow<String?>(null)
 
-	val videos: Flow<PagingData<Video>> = combine(query, sortOption, selectedFolder) { q, sort, folder ->
+	@OptIn(kotlinx.coroutines.FlowPreview::class)
+	private val debouncedQuery = query
+		.debounce(300L)
+		.distinctUntilChanged()
+
+	val videos: Flow<PagingData<Video>> = combine(debouncedQuery, sortOption, selectedFolder) { q, sort, folder ->
 		Triple(q, sort, folder)
 	}.flatMapLatest { (q, sort, folder) ->
 		pagingVideos(q, sort, folder)
@@ -127,12 +135,16 @@ class LibraryViewModel @Inject constructor(
 	}
 
 	fun refresh() {
+		if (isScanning.value) return
 		viewModelScope.launch {
 			isScanning.value = true
 			scanProgress.value = 0f
 			runCatching {
 				scanVideos { indexed, total ->
-					scanProgress.value = if (total > 0) indexed.toFloat() / total else 0f
+					scanProgress.value = when {
+						total <= 0 -> 0f
+						else -> (indexed.toFloat() / total).coerceIn(0f, 1f)
+					}
 				}
 			}
 				.onSuccess { count -> message.value = "Indexed $count videos" }
@@ -159,12 +171,15 @@ class LibraryViewModel @Inject constructor(
 	}
 
 	suspend fun preparePlayback(videoId: Long) {
-		val ids = videoRepository.getVideoIds(
-			query = query.value,
-			sortOption = sortOption.value,
-			folder = selectedFolder.value
+		// Lazy queue: do not load all library IDs. Player expands a window on demand.
+		playbackQueue.beginLazy(
+			context = PlaybackQueueContext(
+				query = query.value,
+				sortOption = sortOption.value,
+				folder = selectedFolder.value
+			),
+			startId = videoId
 		)
-		playbackQueue.setQueue(ids, videoId)
 	}
 
 	private data class LayoutControls(
