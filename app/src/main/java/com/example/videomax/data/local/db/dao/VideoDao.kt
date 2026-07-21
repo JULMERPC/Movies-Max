@@ -7,6 +7,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.RawQuery
 import androidx.sqlite.db.SupportSQLiteQuery
+import com.example.videomax.data.local.db.entity.ScanKeepIdEntity
 import com.example.videomax.data.local.db.entity.VideoEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -171,11 +172,23 @@ interface VideoDao {
 	@Query("SELECT COUNT(*) FROM videos")
 	suspend fun count(): Int
 
-	@Query("SELECT id FROM videos")
-	suspend fun getAllIds(): List<Long>
-
 	@Query("DELETE FROM videos WHERE id IN (:ids)")
 	suspend fun deleteByIds(ids: List<Long>)
+
+	// --- Scan keep-set (stale sync without loading all IDs into memory) ---
+
+	@Query("DELETE FROM scan_keep_ids")
+	suspend fun clearScanKeepIds()
+
+	@Insert(onConflict = OnConflictStrategy.REPLACE)
+	suspend fun insertScanKeepIds(ids: List<ScanKeepIdEntity>)
+
+	/**
+	 * Removes Room videos that were not seen in the current MediaStore scan.
+	 * Runs entirely in SQLite — no full ID list materialization in the JVM.
+	 */
+	@Query("DELETE FROM videos WHERE id NOT IN (SELECT id FROM scan_keep_ids)")
+	suspend fun deleteVideosNotInScanKeepSet()
 
 	/** Keyset / page queries for lazy playback queues. */
 	@RawQuery

@@ -90,6 +90,9 @@ class PlayerViewModel @Inject constructor(
 	private var isSwitchingMedia = false
 	private var playCountRecordedFor: Long? = null
 	private val expandMutex = Mutex()
+	/** Session cache: videoId → sidecar tracks (avoids re-scanning the same file). */
+	private val subtitleCache = mutableMapOf<Long, List<SubtitleTrack>>()
+	private var subtitleLoadJob: Job? = null
 
 	private val playerListener = object : Player.Listener {
 		override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -145,19 +148,19 @@ class PlayerViewModel @Inject constructor(
 			_uiState.update {
 				it.copy(
 					video = video,
+					subtitleTracks = emptyList(),
 					selectedSubtitleIndex = -1,
 					positionMs = 0L,
 					durationMs = video.durationMs,
 					controlsVisible = true
 				)
 			}
+			externalSubtitles = emptyList()
 
 			publishQueueState()
 			showControls()
-			viewModelScope.launch {
-				attachSidecarSubtitlesIfNeeded(video)
-				maybeExpandAroundPlayhead()
-			}
+			scheduleSidecarSubtitleLoad(video)
+			viewModelScope.launch { maybeExpandAroundPlayhead() }
 		}
 
 		override fun onTracksChanged(tracks: Tracks) {
@@ -214,6 +217,7 @@ class PlayerViewModel @Inject constructor(
 	/**
 	 * Starts the selected video immediately, then builds / expands the ExoPlayer
 	 * playlist without blocking first paint / first frame.
+	 * Sidecar subtitles are loaded only for the playing item (never for the whole queue).
 	 */
 	private fun setupPlaylist(startVideoId: Long) {
 		viewModelScope.launch {
@@ -229,7 +233,7 @@ class PlayerViewModel @Inject constructor(
 
 			isSwitchingMedia = true
 			try {
-				player.setMediaItems(listOf(buildMediaItem(startVideo, includeSidecars = false)), 0, resumePosition)
+				player.setMediaItems(listOf(buildMediaItem(startVideo)), 0, resumePosition)
 				player.prepare()
 				player.playbackParameters = PlaybackParameters(_uiState.value.playbackSpeed)
 				applyPlayerRepeatMode(_uiState.value.repeatMode)
@@ -238,13 +242,10 @@ class PlayerViewModel @Inject constructor(
 				isSwitchingMedia = false
 			}
 
-			externalSubtitles = withContext(Dispatchers.IO) {
-				SubtitleHelper.findExternalSubtitles(startVideo.path)
-			}
 			_uiState.update {
 				it.copy(
 					video = startVideo,
-					subtitleTracks = externalSubtitles,
+					subtitleTracks = emptyList(),
 					selectedSubtitleIndex = -1,
 					durationMs = startVideo.durationMs,
 					controlsVisible = true
@@ -253,27 +254,44 @@ class PlayerViewModel @Inject constructor(
 			publishQueueState()
 			showControls()
 
-			if (externalSubtitles.isNotEmpty()) {
-				attachSidecarSubtitlesIfNeeded(startVideo)
-			}
+			// Non-blocking: discover sidecars for this video only while playback already runs.
+			scheduleSidecarSubtitleLoad(startVideo)
 
 			if (playbackQueue.isLazy()) {
 				expandInitialLazyWindow(startVideoId)
 			} else {
 				loadEagerPlaylist(startVideoId, resumePosition)
 			}
+			// Playlist rebuilds strip MediaItem subtitle configs — re-attach from cache/IO.
+			_uiState.value.video?.let { scheduleSidecarSubtitleLoad(it) }
 		}
 	}
 
-	/** Scan sidecar subs off the main thread; attach to the current MediaItem when found. */
-	private suspend fun attachSidecarSubtitlesIfNeeded(video: Video) {
-		val tracks = withContext(Dispatchers.IO) {
-			SubtitleHelper.findExternalSubtitles(video.path)
+	private fun scheduleSidecarSubtitleLoad(video: Video) {
+		subtitleLoadJob?.cancel()
+		subtitleLoadJob = viewModelScope.launch {
+			loadAndAttachSidecarSubtitles(video)
 		}
+	}
+
+	/**
+	 * Loads external subtitles for [video] on [Dispatchers.IO] (with session cache),
+	 * then attaches them to the current MediaItem without stopping playback.
+	 * Uses [C.SELECTION_FLAG_DEFAULT] so ExoPlayer auto-selects when tracks exist.
+	 */
+	private suspend fun loadAndAttachSidecarSubtitles(video: Video) {
+		val tracks = subtitleCache[video.id] ?: withContext(Dispatchers.IO) {
+			runCatching { SubtitleHelper.findExternalSubtitles(video.path) }
+				.getOrDefault(emptyList())
+		}.also { subtitleCache[video.id] = it }
+
+		// User may have already switched away.
+		if (_uiState.value.video?.id != video.id) return
+		if (player.currentMediaItem?.mediaId != video.id.toString()) return
+
 		externalSubtitles = tracks
 		_uiState.update { it.copy(subtitleTracks = tracks) }
 		if (tracks.isEmpty()) return
-		if (player.currentMediaItem?.mediaId != video.id.toString()) return
 
 		val configs = tracks.map { track ->
 			MediaItem.SubtitleConfiguration.Builder(Uri.parse(track.uri))
@@ -286,6 +304,7 @@ class PlayerViewModel @Inject constructor(
 		val playWhenReady = player.playWhenReady
 		val index = player.currentMediaItemIndex
 		if (index < 0) return
+
 		isSwitchingMedia = true
 		try {
 			player.replaceMediaItem(
@@ -299,6 +318,11 @@ class PlayerViewModel @Inject constructor(
 			)
 			player.seekTo(index, position)
 			player.playWhenReady = playWhenReady
+			// Keep text tracks enabled so DEFAULT selection can apply (auto subtitle).
+			player.trackSelectionParameters = player.trackSelectionParameters
+				.buildUpon()
+				.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+				.build()
 		} finally {
 			isSwitchingMedia = false
 		}
@@ -451,6 +475,8 @@ class PlayerViewModel @Inject constructor(
 			}
 			publishQueueState()
 		}
+		// Re-apply sidecars after setMediaItems wiped configs.
+		_uiState.value.video?.let { scheduleSidecarSubtitleLoad(it) }
 	}
 
 	/** Wrap Repeat All previous to the last page of the filtered library. */
@@ -484,6 +510,7 @@ class PlayerViewModel @Inject constructor(
 			}
 			publishQueueState()
 		}
+		_uiState.value.video?.let { scheduleSidecarSubtitleLoad(it) }
 	}
 
 	private suspend fun buildMediaItems(ids: List<Long>): List<MediaItem> =
@@ -491,29 +518,18 @@ class PlayerViewModel @Inject constructor(
 			if (ids.isEmpty()) return@withContext emptyList()
 			val videos = videoRepository.getVideosByIds(ids)
 			val map = videos.associateBy { it.id }
-			// Skip filesystem subtitle scans here — attach lazily for the playing item only.
-			ids.mapNotNull { id -> map[id]?.let { buildMediaItem(it, includeSidecars = false) } }
+			// Never scan the filesystem for subtitles while building the queue.
+			ids.mapNotNull { id -> map[id]?.let { buildMediaItem(it) } }
 		}
 
-	private fun buildMediaItem(video: Video, includeSidecars: Boolean = false): MediaItem {
-		val subtitleConfigs = if (includeSidecars) {
-			SubtitleHelper.findExternalSubtitles(video.path).map { track ->
-				MediaItem.SubtitleConfiguration.Builder(Uri.parse(track.uri))
-					.setMimeType(track.mimeType)
-					.setLabel(track.label)
-					.setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
-					.build()
-			}
-		} else {
-			emptyList()
-		}
-		return MediaItem.Builder()
+	/** MediaItem without sidecar configs — subs are attached lazily for the playing item. */
+	private fun buildMediaItem(video: Video): MediaItem =
+		MediaItem.Builder()
 			.setUri(Uri.parse(video.uri))
 			.setMediaId(video.id.toString())
-			.setSubtitleConfigurations(subtitleConfigs)
 			.setTag(video)
 			.build()
-	}
+
 
 	fun playPrevious() {
 		viewModelScope.launch {
@@ -722,12 +738,17 @@ class PlayerViewModel @Inject constructor(
 	fun addExternalSubtitle(uri: Uri, mimeType: String, label: String) {
 		val track = SubtitleTrack(uri.toString(), label, mimeType)
 		externalSubtitles = externalSubtitles + track
+		val video = _uiState.value.video
+		if (video != null) {
+			subtitleCache[video.id] = externalSubtitles
+		}
 		_uiState.update { it.copy(subtitleTracks = externalSubtitles) }
-		val video = _uiState.value.video ?: return
+		if (video == null) return
 		val configs = externalSubtitles.map {
 			MediaItem.SubtitleConfiguration.Builder(Uri.parse(it.uri))
 				.setMimeType(it.mimeType)
 				.setLabel(it.label)
+				.setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
 				.build()
 		}
 		val playWhenReady = player.playWhenReady
@@ -794,6 +815,8 @@ class PlayerViewModel @Inject constructor(
 		runBlocking {
 			runCatching { persistProgress() }
 		}
+		subtitleLoadJob?.cancel()
+		subtitleCache.clear()
 		progressJob?.cancel()
 		hideControlsJob?.cancel()
 		gestureHintJob?.cancel()

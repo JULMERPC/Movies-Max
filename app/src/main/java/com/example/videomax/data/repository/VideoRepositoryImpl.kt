@@ -6,6 +6,7 @@ import androidx.paging.PagingData
 import androidx.paging.map
 import com.example.videomax.data.local.db.QueueWindowSql
 import com.example.videomax.data.local.db.dao.VideoDao
+import com.example.videomax.data.local.db.entity.ScanKeepIdEntity
 import com.example.videomax.data.local.db.entity.VideoEntity
 import com.example.videomax.data.local.mediastore.MediaStoreVideoScanner
 import com.example.videomax.data.mapper.toDomain
@@ -217,15 +218,20 @@ class VideoRepositoryImpl @Inject constructor(
 	 * Progressive MediaStore → Room sync:
 	 * each scanner batch is filtered/merged and upserted immediately so Paging
 	 * surfaces videos while the rest of the device is still being scanned.
+	 *
+	 * Stale cleanup uses a SQLite keep-set table + set-difference DELETE so we
+	 * never load every Room / MediaStore ID into JVM memory at once.
 	 */
 	override suspend fun scanDeviceVideos(
 		onProgress: (suspend (indexed: Int, totalHint: Int) -> Unit)?
 	): Int = withContext(Dispatchers.IO) {
 		val settings = settingsRepository.settings.first()
-		val keepIds = HashSet<Long>()
 		var indexed = 0
 		var totalHint = 0
 		var receivedAny = false
+		var keptAny = false
+
+		videoDao.clearScanKeepIds()
 
 		scanner.scanBatches(BATCH_SIZE).collect { batch ->
 			receivedAny = true
@@ -255,7 +261,8 @@ class VideoRepositoryImpl @Inject constructor(
 
 			if (merged.isNotEmpty()) {
 				videoDao.upsertAll(merged)
-				keepIds.addAll(merged.map { it.id })
+				videoDao.insertScanKeepIds(merged.map { ScanKeepIdEntity(it.id) })
+				keptAny = true
 				indexed += merged.size
 				onProgress?.invoke(indexed, totalHint.coerceAtLeast(indexed))
 			} else {
@@ -264,17 +271,17 @@ class VideoRepositoryImpl @Inject constructor(
 			yield()
 		}
 
-		if (!receivedAny || keepIds.isEmpty()) {
+		if (!receivedAny || !keptAny) {
 			videoDao.clearAll()
+			videoDao.clearScanKeepIds()
 			onProgress?.invoke(0, 0)
 			return@withContext 0
 		}
 
-		val staleIds = videoDao.getAllIds().filter { it !in keepIds }
-		staleIds.chunked(500).forEach { chunk ->
-			videoDao.deleteByIds(chunk)
-			yield()
-		}
+		// Single SQL set-difference: drop Room rows absent from this scan's keep-set.
+		videoDao.deleteVideosNotInScanKeepSet()
+		videoDao.clearScanKeepIds()
+		yield()
 
 		onProgress?.invoke(indexed, indexed)
 		indexed

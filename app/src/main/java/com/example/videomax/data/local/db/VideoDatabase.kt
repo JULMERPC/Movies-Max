@@ -8,6 +8,7 @@ import com.example.videomax.data.local.db.dao.VideoDao
 import com.example.videomax.data.local.db.entity.HistoryEntity
 import com.example.videomax.data.local.db.entity.PlaylistEntity
 import com.example.videomax.data.local.db.entity.PlaylistVideoCrossRef
+import com.example.videomax.data.local.db.entity.ScanKeepIdEntity
 import com.example.videomax.data.local.db.entity.VideoEntity
 
 @Database(
@@ -15,9 +16,10 @@ import com.example.videomax.data.local.db.entity.VideoEntity
 		VideoEntity::class,
 		PlaylistEntity::class,
 		PlaylistVideoCrossRef::class,
-		HistoryEntity::class
+		HistoryEntity::class,
+		ScanKeepIdEntity::class
 	],
-	version = 3,
+	version = 4,
 	exportSchema = false
 )
 abstract class VideoDatabase : RoomDatabase() {
