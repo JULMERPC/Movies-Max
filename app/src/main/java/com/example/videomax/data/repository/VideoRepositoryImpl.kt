@@ -18,9 +18,11 @@ import com.example.videomax.domain.repository.VideoRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
+import com.example.videomax.data.local.db.FtsQuery
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -40,18 +42,33 @@ class VideoRepositoryImpl @Inject constructor(
 
 	override fun pagingVideos(query: String, sortOption: SortOption): Flow<PagingData<Video>> =
 		Pager(pagingConfig) {
-			val q = query.trim()
-			when (sortOption) {
-				SortOption.DATE_DESC -> videoDao.pagingVideosDateDesc(q)
-				SortOption.DATE_ASC -> videoDao.pagingVideosDateAsc(q)
-				SortOption.NAME_ASC -> videoDao.pagingVideosNameAsc(q)
-				SortOption.NAME_DESC -> videoDao.pagingVideosNameDesc(q)
-				SortOption.DURATION_DESC -> videoDao.pagingVideosDurationDesc(q)
-				SortOption.DURATION_ASC -> videoDao.pagingVideosDurationAsc(q)
-				SortOption.SIZE_DESC -> videoDao.pagingVideosSizeDesc(q)
-				SortOption.SIZE_ASC -> videoDao.pagingVideosSizeAsc(q)
+			val fts = FtsQuery.fromUserInput(query)
+			if (fts == null) {
+				when (sortOption) {
+					SortOption.DATE_DESC -> videoDao.pagingVideosDateDesc()
+					SortOption.DATE_ASC -> videoDao.pagingVideosDateAsc()
+					SortOption.NAME_ASC -> videoDao.pagingVideosNameAsc()
+					SortOption.NAME_DESC -> videoDao.pagingVideosNameDesc()
+					SortOption.DURATION_DESC -> videoDao.pagingVideosDurationDesc()
+					SortOption.DURATION_ASC -> videoDao.pagingVideosDurationAsc()
+					SortOption.SIZE_DESC -> videoDao.pagingVideosSizeDesc()
+					SortOption.SIZE_ASC -> videoDao.pagingVideosSizeAsc()
+				}
+			} else {
+				when (sortOption) {
+					SortOption.DATE_DESC -> videoDao.pagingSearchDateDesc(fts)
+					SortOption.DATE_ASC -> videoDao.pagingSearchDateAsc(fts)
+					SortOption.NAME_ASC -> videoDao.pagingSearchNameAsc(fts)
+					SortOption.NAME_DESC -> videoDao.pagingSearchNameDesc(fts)
+					SortOption.DURATION_DESC -> videoDao.pagingSearchDurationDesc(fts)
+					SortOption.DURATION_ASC -> videoDao.pagingSearchDurationAsc(fts)
+					SortOption.SIZE_DESC -> videoDao.pagingSearchSizeDesc(fts)
+					SortOption.SIZE_ASC -> videoDao.pagingSearchSizeAsc(fts)
+				}
 			}
-		}.flow.map { paging -> paging.map { it.toDomain() } }
+		}.flow
+			.map { paging -> paging.map { it.toDomain() } }
+			.flowOn(Dispatchers.IO)
 
 	override fun pagingVideosByFolder(folder: String, sortOption: SortOption): Flow<PagingData<Video>> =
 		Pager(pagingConfig) {
@@ -65,7 +82,9 @@ class VideoRepositoryImpl @Inject constructor(
 				SortOption.SIZE_DESC -> videoDao.pagingByFolderSizeDesc(folder)
 				SortOption.SIZE_ASC -> videoDao.pagingByFolderSizeAsc(folder)
 			}
-		}.flow.map { paging -> paging.map { it.toDomain() } }
+		}.flow
+			.map { paging -> paging.map { it.toDomain() } }
+			.flowOn(Dispatchers.IO)
 
 	override fun observeFolders(): Flow<List<String>> = videoDao.observeFolders()
 
@@ -87,19 +106,7 @@ class VideoRepositoryImpl @Inject constructor(
 		sortOption: SortOption,
 		folder: String?
 	): List<Long> = withContext(Dispatchers.IO) {
-		val q = query.trim()
-		if (folder == null) {
-			when (sortOption) {
-				SortOption.DATE_DESC -> videoDao.getVideoIdsDateDesc(q)
-				SortOption.DATE_ASC -> videoDao.getVideoIdsDateAsc(q)
-				SortOption.NAME_ASC -> videoDao.getVideoIdsNameAsc(q)
-				SortOption.NAME_DESC -> videoDao.getVideoIdsNameDesc(q)
-				SortOption.DURATION_DESC -> videoDao.getVideoIdsDurationDesc(q)
-				SortOption.DURATION_ASC -> videoDao.getVideoIdsDurationAsc(q)
-				SortOption.SIZE_DESC -> videoDao.getVideoIdsSizeDesc(q)
-				SortOption.SIZE_ASC -> videoDao.getVideoIdsSizeAsc(q)
-			}
-		} else {
+		if (folder != null) {
 			when (sortOption) {
 				SortOption.DATE_DESC -> videoDao.getVideoIdsByFolderDateDesc(folder)
 				SortOption.DATE_ASC -> videoDao.getVideoIdsByFolderDateAsc(folder)
@@ -109,6 +116,31 @@ class VideoRepositoryImpl @Inject constructor(
 				SortOption.DURATION_ASC -> videoDao.getVideoIdsByFolderDurationAsc(folder)
 				SortOption.SIZE_DESC -> videoDao.getVideoIdsByFolderSizeDesc(folder)
 				SortOption.SIZE_ASC -> videoDao.getVideoIdsByFolderSizeAsc(folder)
+			}
+		} else {
+			val fts = FtsQuery.fromUserInput(query)
+			if (fts == null) {
+				when (sortOption) {
+					SortOption.DATE_DESC -> videoDao.getVideoIdsDateDesc()
+					SortOption.DATE_ASC -> videoDao.getVideoIdsDateAsc()
+					SortOption.NAME_ASC -> videoDao.getVideoIdsNameAsc()
+					SortOption.NAME_DESC -> videoDao.getVideoIdsNameDesc()
+					SortOption.DURATION_DESC -> videoDao.getVideoIdsDurationDesc()
+					SortOption.DURATION_ASC -> videoDao.getVideoIdsDurationAsc()
+					SortOption.SIZE_DESC -> videoDao.getVideoIdsSizeDesc()
+					SortOption.SIZE_ASC -> videoDao.getVideoIdsSizeAsc()
+				}
+			} else {
+				when (sortOption) {
+					SortOption.DATE_DESC -> videoDao.getSearchIdsDateDesc(fts)
+					SortOption.DATE_ASC -> videoDao.getSearchIdsDateAsc(fts)
+					SortOption.NAME_ASC -> videoDao.getSearchIdsNameAsc(fts)
+					SortOption.NAME_DESC -> videoDao.getSearchIdsNameDesc(fts)
+					SortOption.DURATION_DESC -> videoDao.getSearchIdsDurationDesc(fts)
+					SortOption.DURATION_ASC -> videoDao.getSearchIdsDurationAsc(fts)
+					SortOption.SIZE_DESC -> videoDao.getSearchIdsSizeDesc(fts)
+					SortOption.SIZE_ASC -> videoDao.getSearchIdsSizeAsc(fts)
+				}
 			}
 		}
 	}

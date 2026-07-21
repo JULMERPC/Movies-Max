@@ -63,7 +63,7 @@ class LibraryViewModel @Inject constructor(
 
 	@OptIn(kotlinx.coroutines.FlowPreview::class)
 	private val debouncedQuery = query
-		.debounce(300L)
+		.debounce(SEARCH_DEBOUNCE_MS)
 		.distinctUntilChanged()
 
 	val videos: Flow<PagingData<Video>> = combine(debouncedQuery, sortOption, selectedFolder) { q, sort, folder ->
@@ -197,4 +197,8 @@ class LibraryViewModel @Inject constructor(
 		val isGrid: Boolean,
 		val selectedFolder: String?
 	)
+
+	private companion object {
+		const val SEARCH_DEBOUNCE_MS = 300L
+	}
 }

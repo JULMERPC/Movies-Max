@@ -38,12 +38,15 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import kotlin.math.abs
 
+data class PlayerProgressState(
+	val positionMs: Long = 0L,
+	val bufferedMs: Long = 0L,
+	val durationMs: Long = 0L
+)
+
 data class PlayerUiState(
 	val video: Video? = null,
 	val isPlaying: Boolean = false,
-	val positionMs: Long = 0L,
-	val durationMs: Long = 0L,
-	val bufferedMs: Long = 0L,
 	val playbackSpeed: Float = 1f,
 	val controlsVisible: Boolean = true,
 	val isLocked: Boolean = false,
@@ -82,6 +85,10 @@ class PlayerViewModel @Inject constructor(
 	private val _uiState = MutableStateFlow(PlayerUiState())
 	val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
+	/** High-frequency timeline updates — collected only by the progress bar UI. */
+	private val _progressState = MutableStateFlow(PlayerProgressState())
+	val progressState: StateFlow<PlayerProgressState> = _progressState.asStateFlow()
+
 	private var settings: AppSettings = AppSettings()
 	private var progressJob: Job? = null
 	private var hideControlsJob: Job? = null
@@ -102,9 +109,11 @@ class PlayerViewModel @Inject constructor(
 
 		override fun onPlaybackStateChanged(playbackState: Int) {
 			if (playbackState == Player.STATE_READY) {
-				_uiState.update {
-					it.copy(durationMs = player.duration.coerceAtLeast(0L))
-				}
+				publishProgress(
+					positionMs = player.currentPosition.coerceAtLeast(0L),
+					bufferedMs = player.bufferedPosition.coerceAtLeast(0L),
+					durationMs = player.duration.coerceAtLeast(0L)
+				)
 			}
 			if (playbackState == Player.STATE_ENDED) {
 				viewModelScope.launch {
@@ -150,11 +159,14 @@ class PlayerViewModel @Inject constructor(
 					video = video,
 					subtitleTracks = emptyList(),
 					selectedSubtitleIndex = -1,
-					positionMs = 0L,
-					durationMs = video.durationMs,
 					controlsVisible = true
 				)
 			}
+			publishProgress(
+				positionMs = 0L,
+				bufferedMs = 0L,
+				durationMs = video.durationMs
+			)
 			externalSubtitles = emptyList()
 
 			publishQueueState()
@@ -189,18 +201,29 @@ class PlayerViewModel @Inject constructor(
 		}
 		progressJob = viewModelScope.launch {
 			while (isActive) {
-				_uiState.update {
-					it.copy(
-						positionMs = player.currentPosition.coerceAtLeast(0L),
-						bufferedMs = player.bufferedPosition.coerceAtLeast(0L),
-						durationMs = player.duration.takeIf { d -> d > 0 } ?: it.durationMs
-					)
-				}
-				delay(500)
+				val position = player.currentPosition.coerceAtLeast(0L)
+				val buffered = player.bufferedPosition.coerceAtLeast(0L)
+				val duration = player.duration.takeIf { d -> d > 0 }
+					?: _progressState.value.durationMs
+				publishProgress(position, buffered, duration)
+				delay(PROGRESS_POLL_MS)
 			}
 		}
 	}
 
+	/**
+	 * Emits progress only when values actually change, so collectors skip no-op frames.
+	 */
+	private fun publishProgress(positionMs: Long, bufferedMs: Long, durationMs: Long) {
+		val next = PlayerProgressState(
+			positionMs = positionMs,
+			bufferedMs = bufferedMs,
+			durationMs = durationMs.coerceAtLeast(0L)
+		)
+		if (next != _progressState.value) {
+			_progressState.value = next
+		}
+	}
 	private fun publishQueueState() {
 		_uiState.update {
 			it.copy(
@@ -247,10 +270,14 @@ class PlayerViewModel @Inject constructor(
 					video = startVideo,
 					subtitleTracks = emptyList(),
 					selectedSubtitleIndex = -1,
-					durationMs = startVideo.durationMs,
 					controlsVisible = true
 				)
 			}
+			publishProgress(
+				positionMs = resumePosition,
+				bufferedMs = 0L,
+				durationMs = startVideo.durationMs
+			)
 			publishQueueState()
 			showControls()
 
@@ -824,5 +851,9 @@ class PlayerViewModel @Inject constructor(
 		player.stop()
 		player.clearMediaItems()
 		super.onCleared()
+	}
+
+	private companion object {
+		const val PROGRESS_POLL_MS = 500L
 	}
 }

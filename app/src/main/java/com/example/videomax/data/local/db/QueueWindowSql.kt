@@ -82,11 +82,12 @@ internal object QueueWindowSql {
 		return if (folder != null) {
 			"folderName = ?" to listOf(folder)
 		} else {
-			val q = query.trim()
-			if (q.isEmpty()) {
+			val fts = FtsQuery.fromUserInput(query)
+			if (fts == null) {
 				"1 = 1" to emptyList()
 			} else {
-				"(displayName LIKE '%' || ? || '%' OR folderName LIKE '%' || ? || '%')" to listOf(q, q)
+				// Same FTS index as Library search — no leading-wildcard LIKE.
+				"rowid IN (SELECT rowid FROM videos_fts WHERE videos_fts MATCH ?)" to listOf(fts)
 			}
 		}
 	}

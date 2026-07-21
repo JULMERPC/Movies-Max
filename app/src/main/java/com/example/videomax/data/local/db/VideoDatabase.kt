@@ -10,16 +10,18 @@ import com.example.videomax.data.local.db.entity.PlaylistEntity
 import com.example.videomax.data.local.db.entity.PlaylistVideoCrossRef
 import com.example.videomax.data.local.db.entity.ScanKeepIdEntity
 import com.example.videomax.data.local.db.entity.VideoEntity
+import com.example.videomax.data.local.db.entity.VideoFtsEntity
 
 @Database(
 	entities = [
 		VideoEntity::class,
+		VideoFtsEntity::class,
 		PlaylistEntity::class,
 		PlaylistVideoCrossRef::class,
 		HistoryEntity::class,
 		ScanKeepIdEntity::class
 	],
-	version = 4,
+	version = 5,
 	exportSchema = false
 )
 abstract class VideoDatabase : RoomDatabase() {
