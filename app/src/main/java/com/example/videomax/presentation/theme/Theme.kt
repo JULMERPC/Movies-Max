@@ -12,9 +12,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.videomax.domain.model.ThemeMode
 
-private val TealPrimary = Color(0xFF0B6E6E)
+private val TealPrimary = Color(0xFF2C92E5)
 private val TealContainer = Color(0xFF9EF0EF)
-private val CoralSecondary = Color(0xFFB24D2A)
+private val CoralSecondary = Color(0xFF9D0F1A)
 
 private val LightColors = lightColorScheme(
 	primary = TealPrimary,

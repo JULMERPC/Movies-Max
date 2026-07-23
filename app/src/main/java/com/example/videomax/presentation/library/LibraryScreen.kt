@@ -289,10 +289,10 @@ fun VideoContent(
 		else -> {
 			if (isGrid) {
 				LazyVerticalGrid(
-					columns = GridCells.Adaptive(120.dp),
-					contentPadding = PaddingValues(8.dp),
-					verticalArrangement = Arrangement.spacedBy(6.dp),
-					horizontalArrangement = Arrangement.spacedBy(6.dp),
+					columns = GridCells.Adaptive(168.dp),
+					contentPadding = PaddingValues(12.dp),
+					verticalArrangement = Arrangement.spacedBy(14.dp),
+					horizontalArrangement = Arrangement.spacedBy(12.dp),
 					modifier = Modifier.fillMaxSize()
 				) {
 					items(
@@ -307,7 +307,7 @@ fun VideoContent(
 								video = video,
 								onClick = { onVideoClick(video.id) },
 								onFavoriteClick = { onFavoriteClick(video.id) },
-								showOnlyThumbnail = true
+								showOnlyThumbnail = false
 							)
 						}
 					}
@@ -343,14 +343,14 @@ fun VideoContent(
 private fun LibraryLoadingPlaceholders(isGrid: Boolean) {
 	if (isGrid) {
 		LazyVerticalGrid(
-			columns = GridCells.Adaptive(112.dp),
+			columns = GridCells.Adaptive(168.dp),
 			contentPadding = PaddingValues(12.dp),
-			verticalArrangement = Arrangement.spacedBy(8.dp),
-			horizontalArrangement = Arrangement.spacedBy(8.dp),
+			verticalArrangement = Arrangement.spacedBy(14.dp),
+			horizontalArrangement = Arrangement.spacedBy(12.dp),
 			modifier = Modifier.fillMaxSize(),
 			userScrollEnabled = false
 		) {
-			items(18) { VideoGridSkeleton() }
+			items(12) { VideoGridSkeleton() }
 		}
 	} else {
 		LazyColumn(
@@ -365,13 +365,31 @@ private fun LibraryLoadingPlaceholders(isGrid: Boolean) {
 
 @Composable
 private fun VideoGridSkeleton() {
-	Surface(
-		modifier = Modifier
-			.fillMaxWidth()
-			.aspectRatio(16f / 9f),
-		shape = MaterialTheme.shapes.medium,
-		color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-	) {}
+	Column(modifier = Modifier.fillMaxWidth()) {
+		Surface(
+			modifier = Modifier
+				.fillMaxWidth()
+				.aspectRatio(16f / 9f),
+			shape = MaterialTheme.shapes.medium,
+			color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+		) {}
+		Spacer(modifier = Modifier.height(8.dp))
+		Surface(
+			modifier = Modifier
+				.fillMaxWidth(0.9f)
+				.height(14.dp),
+			shape = MaterialTheme.shapes.small,
+			color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+		) {}
+		Spacer(modifier = Modifier.height(6.dp))
+		Surface(
+			modifier = Modifier
+				.fillMaxWidth(0.55f)
+				.height(12.dp),
+			shape = MaterialTheme.shapes.small,
+			color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+		) {}
+	}
 }
 
 @Composable

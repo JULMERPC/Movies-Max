@@ -46,7 +46,7 @@ import com.example.videomax.domain.model.Video
 import com.example.videomax.util.Formatters
 
 /**
- * Compact grid cell: thumbnail + duration only (no card chrome / press animations).
+ * Grid cell with large thumbnail plus title / folder / size description.
  */
 @Composable
 fun VideoGridItem(
@@ -62,7 +62,7 @@ fun VideoGridItem(
 			modifier = modifier
 				.fillMaxWidth()
 				.aspectRatio(16f / 9f)
-				.clip(RoundedCornerShape(8.dp))
+				.clip(RoundedCornerShape(10.dp))
 				.background(MaterialTheme.colorScheme.surfaceVariant)
 				.clickable(onClick = onClick)
 		) {
@@ -78,9 +78,9 @@ fun VideoGridItem(
 				color = Color.White,
 				modifier = Modifier
 					.align(Alignment.BottomEnd)
-					.padding(4.dp)
+					.padding(6.dp)
 					.background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(4.dp))
-					.padding(horizontal = 4.dp, vertical = 1.dp)
+					.padding(horizontal = 5.dp, vertical = 2.dp)
 			)
 			if (video.lastPositionMs > 0 && video.durationMs > 0) {
 				LinearProgressIndicator(
@@ -100,14 +100,15 @@ fun VideoGridItem(
 	Column(
 		modifier = modifier
 			.fillMaxWidth()
-			.clip(RoundedCornerShape(12.dp))
+			.clip(RoundedCornerShape(14.dp))
 			.clickable(onClick = onClick)
 	) {
 		Box(
 			modifier = Modifier
 				.fillMaxWidth()
 				.aspectRatio(16f / 9f)
-				.clip(RoundedCornerShape(12.dp))
+				.clip(RoundedCornerShape(14.dp))
+				.background(MaterialTheme.colorScheme.surfaceVariant)
 		) {
 			VideoThumbnail(
 				uri = video.uri,
@@ -120,7 +121,7 @@ fun VideoGridItem(
 					.fillMaxSize()
 					.background(
 						Brush.verticalGradient(
-							listOf(Color.Transparent, Color.Black.copy(alpha = 0.5f))
+							listOf(Color.Transparent, Color.Black.copy(alpha = 0.45f))
 						)
 					)
 			)
@@ -130,9 +131,9 @@ fun VideoGridItem(
 				color = Color.White,
 				modifier = Modifier
 					.align(Alignment.BottomEnd)
-					.padding(8.dp)
-					.background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(6.dp))
-					.padding(horizontal = 6.dp, vertical = 2.dp)
+					.padding(10.dp)
+					.background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+					.padding(horizontal = 7.dp, vertical = 3.dp)
 			)
 			IconButton(
 				onClick = onFavoriteClick,
@@ -156,17 +157,26 @@ fun VideoGridItem(
 				)
 			}
 		}
-		Column(modifier = Modifier.padding(top = 8.dp, start = 2.dp, end = 2.dp, bottom = 4.dp)) {
+		Column(modifier = Modifier.padding(top = 10.dp, start = 2.dp, end = 2.dp, bottom = 2.dp)) {
 			Text(
 				text = video.displayName,
 				style = MaterialTheme.typography.titleSmall,
 				maxLines = 2,
 				overflow = TextOverflow.Ellipsis
 			)
+			Spacer(modifier = Modifier.height(4.dp))
 			Text(
-				text = "${video.folderName} · ${Formatters.formatFileSize(video.sizeBytes)}",
+				text = video.folderName,
 				style = MaterialTheme.typography.bodySmall,
 				color = MaterialTheme.colorScheme.onSurfaceVariant,
+				maxLines = 1,
+				overflow = TextOverflow.Ellipsis
+			)
+			Spacer(modifier = Modifier.height(2.dp))
+			Text(
+				text = "${Formatters.formatFileSize(video.sizeBytes)} · ${video.resolutionLabel}",
+				style = MaterialTheme.typography.labelSmall,
+				color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
 				maxLines = 1,
 				overflow = TextOverflow.Ellipsis
 			)
