@@ -1,8 +1,12 @@
 package com.example.videomax.presentation.library
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,18 +18,24 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.automirrored.filled.ViewList
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CreateNewFolder
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.VideoFile
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -50,8 +60,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -83,51 +97,85 @@ fun LibraryScreen(
 		}
 	}
 
+	val gradient = Brush.verticalGradient(
+		colors = listOf(
+			MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+			MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f),
+			MaterialTheme.colorScheme.background
+		)
+	)
+
 	Scaffold(
+		containerColor = Color.Transparent,
 		topBar = {
 			LibraryTopBar(
 				videoCountProvider = { state.videoCount },
 				isGridProvider = { state.isGrid },
+				isSearchOpenProvider = { state.isSearchOpen },
+				queryProvider = { state.query },
 				onRefresh = viewModel::refresh,
 				onToggleLayout = viewModel::toggleLayout,
-				onSortSelected = viewModel::onSortSelected
+				onSortSelected = viewModel::onSortSelected,
+				onToggleSearch = viewModel::toggleSearch,
+				onQueryChange = viewModel::onQueryChange
 			)
 		},
 		snackbarHost = { SnackbarHost(snackbarHostState) }
 	) { padding ->
-		Column(
+		Box(
 			modifier = Modifier
 				.fillMaxSize()
+				.background(gradient)
 				.padding(padding)
 		) {
-			ScanningProgressBar(
-				isScanningProvider = { state.isScanning },
-				progressProvider = { state.scanProgress }
-			)
+			Column(
+				modifier = Modifier.fillMaxSize()
+			) {
+				ScanningProgressBar(
+					isScanningProvider = { state.isScanning },
+					progressProvider = { state.scanProgress }
+				)
 
-			SearchBar(
-				queryProvider = { state.query },
-				onQueryChange = viewModel::onQueryChange
-			)
+				FilterModeSelector(
+					selectedMode = state.filterMode,
+					onModeSelected = viewModel::setFilterMode
+				)
 
-			FolderSelector(
-				foldersProvider = { state.folders },
-				selectedFolderProvider = { state.selectedFolder },
-				onFolderSelected = viewModel::selectFolder
-			)
-
-			VideoContent(
-				pagingItems = pagingItems,
-				isGridProvider = { state.isGrid },
-				isScanningProvider = { state.isScanning },
-				onVideoClick = { videoId ->
-					scope.launch {
-						viewModel.preparePlayback(videoId)
-						onOpenPlayer(videoId)
+				when (state.filterMode) {
+					LibraryFilterMode.ALL_VIDEOS -> {
+						VideoContent(
+							pagingItems = pagingItems,
+							isGridProvider = { state.isGrid },
+							isScanningProvider = { state.isScanning },
+							onVideoClick = { videoId ->
+								scope.launch {
+									viewModel.preparePlayback(videoId)
+									onOpenPlayer(videoId)
+								}
+							},
+							onFavoriteClick = viewModel::onFavorite
+						)
 					}
-				},
-				onFavoriteClick = viewModel::onFavorite
-			)
+					LibraryFilterMode.ALL_FOLDERS -> {
+						FolderGrid(
+							folders = state.folders,
+							onFolderClick = { folder ->
+								viewModel.selectFolder(folder)
+								viewModel.setFilterMode(LibraryFilterMode.ALL_VIDEOS)
+							}
+						)
+					}
+					LibraryFilterMode.FOLDER_TREE -> {
+						FolderTree(
+							folders = state.folders,
+							onFolderClick = { folder ->
+								viewModel.selectFolder(folder)
+								viewModel.setFilterMode(LibraryFilterMode.ALL_VIDEOS)
+							}
+						)
+					}
+				}
+			}
 		}
 	}
 }
@@ -137,58 +185,303 @@ fun LibraryScreen(
 fun LibraryTopBar(
 	videoCountProvider: () -> Int,
 	isGridProvider: () -> Boolean,
+	isSearchOpenProvider: () -> Boolean,
+	queryProvider: () -> String,
 	onRefresh: () -> Unit,
 	onToggleLayout: () -> Unit,
-	onSortSelected: (SortOption) -> Unit
+	onSortSelected: (SortOption) -> Unit,
+	onToggleSearch: () -> Unit,
+	onQueryChange: (String) -> Unit
 ) {
 	var sortMenuExpanded by remember { mutableStateOf(false) }
 	val videoCount = videoCountProvider()
 	val isGrid = isGridProvider()
-	TopAppBar(
-		title = {
-			Column {
-				Text("videomax", style = MaterialTheme.typography.headlineSmall)
-				Text(
-					text = "$videoCount videos",
-					style = MaterialTheme.typography.bodyMedium,
-					color = MaterialTheme.colorScheme.onSurfaceVariant
-				)
-			}
-		},
-		actions = {
-			IconButton(onClick = onRefresh) {
-				Icon(Icons.Default.Refresh, contentDescription = "Scan")
-			}
-			IconButton(onClick = onToggleLayout) {
-				Icon(
-					if (isGrid) Icons.AutoMirrored.Filled.ViewList else Icons.Default.GridView,
-					contentDescription = "Toggle layout"
-				)
-			}
-			Box {
-				IconButton(onClick = { sortMenuExpanded = true }) {
-					Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort")
+	val isSearchOpen = isSearchOpenProvider()
+	val query = queryProvider()
+
+	Column {
+		TopAppBar(
+			title = {
+				Column {
+					Text("videomax", style = MaterialTheme.typography.headlineSmall)
+					Text(
+						text = "$videoCount videos",
+						style = MaterialTheme.typography.bodyMedium,
+						color = MaterialTheme.colorScheme.onSurfaceVariant
+					)
 				}
-				DropdownMenu(
-					expanded = sortMenuExpanded,
-					onDismissRequest = { sortMenuExpanded = false }
-				) {
-					SortOption.entries.forEach { option ->
-						DropdownMenuItem(
-							text = { Text(option.label()) },
-							onClick = {
-								onSortSelected(option)
-								sortMenuExpanded = false
-							}
-						)
+			},
+			actions = {
+				IconButton(onClick = onRefresh) {
+					Icon(Icons.Default.Refresh, contentDescription = "Scan")
+				}
+				IconButton(onClick = onToggleLayout) {
+					Icon(
+						if (isGrid) Icons.AutoMirrored.Filled.ViewList else Icons.Default.GridView,
+						contentDescription = "Toggle layout"
+					)
+				}
+				IconButton(onClick = onToggleSearch) {
+					Icon(
+						if (isSearchOpen) Icons.Default.Close else Icons.Default.Search,
+						contentDescription = "Search"
+					)
+				}
+				Box {
+					IconButton(onClick = { sortMenuExpanded = true }) {
+						Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort")
+					}
+					DropdownMenu(
+						expanded = sortMenuExpanded,
+						onDismissRequest = { sortMenuExpanded = false }
+					) {
+						SortOption.entries.forEach { option ->
+							DropdownMenuItem(
+								text = { Text(option.label()) },
+								onClick = {
+									onSortSelected(option)
+									sortMenuExpanded = false
+								}
+							)
+						}
 					}
 				}
-			}
-		},
-		colors = TopAppBarDefaults.topAppBarColors(
-			containerColor = MaterialTheme.colorScheme.surface
+			},
+			colors = TopAppBarDefaults.topAppBarColors(
+				containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.35f),
+				titleContentColor = MaterialTheme.colorScheme.onSurface
+			)
 		)
-	)
+
+		AnimatedVisibility(
+			visible = isSearchOpen,
+			enter = expandVertically() + fadeIn(),
+			exit = shrinkVertically() + fadeOut()
+		) {
+			TextField(
+				value = query,
+				onValueChange = onQueryChange,
+				modifier = Modifier
+					.fillMaxWidth()
+					.padding(horizontal = 16.dp, vertical = 4.dp),
+				placeholder = { Text("Buscar videos o carpetas") },
+				leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+				singleLine = true,
+				shape = MaterialTheme.shapes.extraLarge,
+				colors = TextFieldDefaults.colors(
+					focusedIndicatorColor = Color.Transparent,
+					unfocusedIndicatorColor = Color.Transparent,
+					disabledIndicatorColor = Color.Transparent
+				)
+			)
+		}
+	}
+}
+
+@Composable
+fun FilterModeSelector(
+	selectedMode: LibraryFilterMode,
+	onModeSelected: (LibraryFilterMode) -> Unit
+) {
+	LazyRow(
+		contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+		horizontalArrangement = Arrangement.spacedBy(8.dp)
+	) {
+		item {
+			FilterChip(
+				selected = selectedMode == LibraryFilterMode.ALL_VIDEOS,
+				onClick = { onModeSelected(LibraryFilterMode.ALL_VIDEOS) },
+				label = { Text("Todos los videos") },
+				leadingIcon = {
+					Icon(
+						Icons.Default.VideoFile,
+						contentDescription = null,
+						modifier = Modifier.size(18.dp)
+					)
+				}
+			)
+		}
+		item {
+			FilterChip(
+				selected = selectedMode == LibraryFilterMode.ALL_FOLDERS,
+				onClick = { onModeSelected(LibraryFilterMode.ALL_FOLDERS) },
+				label = { Text("Todas las carpetas") },
+				leadingIcon = {
+					Icon(
+						Icons.Default.Folder,
+						contentDescription = null,
+						modifier = Modifier.size(18.dp)
+					)
+				}
+			)
+		}
+		item {
+			FilterChip(
+				selected = selectedMode == LibraryFilterMode.FOLDER_TREE,
+				onClick = { onModeSelected(LibraryFilterMode.FOLDER_TREE) },
+				label = { Text("Árbol de carpetas") },
+				leadingIcon = {
+					Icon(
+						Icons.Default.CreateNewFolder,
+						contentDescription = null,
+						modifier = Modifier.size(18.dp)
+					)
+				}
+			)
+		}
+	}
+}
+
+@Composable
+fun FolderGrid(
+	folders: List<String>,
+	onFolderClick: (String) -> Unit
+) {
+	if (folders.isEmpty()) {
+		EmptyState(
+			title = "No hay carpetas",
+			subtitle = "Escanea la biblioteca para detectar carpetas."
+		)
+		return
+	}
+	LazyVerticalGrid(
+		columns = GridCells.Adaptive(168.dp),
+		contentPadding = PaddingValues(12.dp),
+		verticalArrangement = Arrangement.spacedBy(10.dp),
+		horizontalArrangement = Arrangement.spacedBy(10.dp),
+		modifier = Modifier.fillMaxSize()
+	) {
+		items(folders.size, key = { folders[it] }) { index ->
+			val folder = folders[index]
+			val folderName = folder.substringAfterLast('/', folder)
+			Surface(
+				modifier = Modifier
+					.fillMaxWidth()
+					.clickable { onFolderClick(folder) },
+				shape = MaterialTheme.shapes.medium,
+				color = MaterialTheme.colorScheme.surface.copy(alpha = 0.55f)
+			) {
+				Row(
+					modifier = Modifier.padding(16.dp),
+					verticalAlignment = Alignment.CenterVertically
+				) {
+					Icon(
+						Icons.Default.Folder,
+						contentDescription = null,
+						tint = MaterialTheme.colorScheme.primary,
+						modifier = Modifier.size(32.dp)
+					)
+					Spacer(modifier = Modifier.width(12.dp))
+					Text(
+						text = folderName,
+						style = MaterialTheme.typography.bodyLarge,
+						maxLines = 2,
+						overflow = TextOverflow.Ellipsis
+					)
+				}
+			}
+		}
+	}
+}
+
+@Composable
+fun FolderTree(
+	folders: List<String>,
+	onFolderClick: (String) -> Unit
+) {
+	if (folders.isEmpty()) {
+		EmptyState(
+			title = "No hay carpetas",
+			subtitle = "Escanea la biblioteca para detectar carpetas."
+		)
+		return
+	}
+
+	val tree = remember(folders) { buildFolderTree(folders) }
+
+	LazyColumn(
+		modifier = Modifier.fillMaxSize(),
+		contentPadding = PaddingValues(12.dp),
+		verticalArrangement = Arrangement.spacedBy(2.dp)
+	) {
+		items(tree.size, key = { tree[it].path }) { index ->
+			val node = tree[index]
+			FolderTreeNode(
+				node = node,
+				onClick = { onFolderClick(node.path) }
+			)
+		}
+	}
+}
+
+@Composable
+private fun FolderTreeNode(
+	node: FolderTreeNodeData,
+	onClick: () -> Unit
+) {
+	Row(
+		modifier = Modifier
+			.fillMaxWidth()
+			.clickable(onClick = onClick)
+			.padding(
+				start = (16 + node.depth * 24).dp,
+				top = 6.dp,
+				bottom = 6.dp,
+				end = 16.dp
+			),
+		verticalAlignment = Alignment.CenterVertically
+	) {
+		Icon(
+			if (node.hasChildren) Icons.Default.FolderOpen else Icons.Default.Folder,
+			contentDescription = null,
+			tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+			modifier = Modifier.size(20.dp)
+		)
+		Spacer(modifier = Modifier.width(8.dp))
+		Text(
+			text = node.name,
+			style = MaterialTheme.typography.bodyMedium,
+			maxLines = 1,
+			overflow = TextOverflow.Ellipsis
+		)
+	}
+}
+
+data class FolderTreeNodeData(
+	val name: String,
+	val path: String,
+	val depth: Int,
+	val hasChildren: Boolean
+)
+
+private fun buildFolderTree(folders: List<String>): List<FolderTreeNodeData> {
+	val sorted = folders.sorted()
+	val pathSet = sorted.toSet()
+	val result = mutableListOf<FolderTreeNodeData>()
+
+	for (folder in sorted) {
+		val segments = folder.split('/').filter { it.isNotEmpty() }
+		for (i in segments.indices) {
+			val subPath = "/" + segments.take(i + 1).joinToString("/")
+			if (subPath !in pathSet) continue
+			val depth = i
+			val name = segments[i]
+			val hasChildren = sorted.any { other ->
+				other != folder && other.startsWith("$subPath/") && other.length > subPath.length + 1
+			}
+			if (result.none { it.path == subPath }) {
+				result.add(
+					FolderTreeNodeData(
+						name = name,
+						path = subPath,
+						depth = depth,
+						hasChildren = hasChildren
+					)
+				)
+			}
+		}
+	}
+	return result
 }
 
 @Composable
@@ -211,61 +504,6 @@ fun ScanningProgressBar(
 }
 
 @Composable
-fun SearchBar(
-	queryProvider: () -> String,
-	onQueryChange: (String) -> Unit
-) {
-	val query = queryProvider()
-	TextField(
-		value = query,
-		onValueChange = onQueryChange,
-		modifier = Modifier
-			.fillMaxWidth()
-			.padding(horizontal = 16.dp, vertical = 8.dp),
-		placeholder = { Text("Search videos or folders") },
-		leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-		singleLine = true,
-		shape = MaterialTheme.shapes.extraLarge,
-		colors = TextFieldDefaults.colors(
-			focusedIndicatorColor = Color.Transparent,
-			unfocusedIndicatorColor = Color.Transparent,
-			disabledIndicatorColor = Color.Transparent
-		)
-	)
-}
-
-@Composable
-fun FolderSelector(
-	foldersProvider: () -> List<String>,
-	selectedFolderProvider: () -> String?,
-	onFolderSelected: (String?) -> Unit
-) {
-	val folders = foldersProvider()
-	val selectedFolder = selectedFolderProvider()
-	if (folders.isNotEmpty()) {
-		LazyRow(
-			contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-			horizontalArrangement = Arrangement.spacedBy(8.dp)
-		) {
-			item {
-				FilterChip(
-					selected = selectedFolder == null,
-					onClick = { onFolderSelected(null) },
-					label = { Text("All") }
-				)
-			}
-			items(folders, key = { it }) { folder ->
-				FilterChip(
-					selected = selectedFolder == folder,
-					onClick = { onFolderSelected(folder) },
-					label = { Text(folder) }
-				)
-			}
-		}
-	}
-}
-
-@Composable
 fun VideoContent(
 	pagingItems: androidx.paging.compose.LazyPagingItems<Video>,
 	isGridProvider: () -> Boolean,
@@ -282,8 +520,8 @@ fun VideoContent(
 		}
 		pagingItems.itemCount == 0 && !isScanning -> {
 			EmptyState(
-				title = "No videos found",
-				subtitle = "Grant media permission and tap refresh to scan your device."
+				title = "No se encontraron videos",
+				subtitle = "Concede permisos de medios y toca actualizar para escanear."
 			)
 		}
 		else -> {
@@ -338,7 +576,6 @@ fun VideoContent(
 	}
 }
 
-/** Non-blocking placeholders while the first MediaStore batches land in Room. */
 @Composable
 private fun LibraryLoadingPlaceholders(isGrid: Boolean) {
 	if (isGrid) {
@@ -428,12 +665,12 @@ private fun VideoListSkeleton() {
 }
 
 private fun SortOption.label(): String = when (this) {
-	SortOption.DATE_DESC -> "Newest first"
-	SortOption.DATE_ASC -> "Oldest first"
-	SortOption.NAME_ASC -> "Name A–Z"
-	SortOption.NAME_DESC -> "Name Z–A"
-	SortOption.DURATION_DESC -> "Longest"
-	SortOption.DURATION_ASC -> "Shortest"
-	SortOption.SIZE_DESC -> "Largest"
-	SortOption.SIZE_ASC -> "Smallest"
+	SortOption.DATE_DESC -> "Más recientes"
+	SortOption.DATE_ASC -> "Más antiguos"
+	SortOption.NAME_ASC -> "Nombre A–Z"
+	SortOption.NAME_DESC -> "Nombre Z–A"
+	SortOption.DURATION_DESC -> "Más largos"
+	SortOption.DURATION_ASC -> "Más cortos"
+	SortOption.SIZE_DESC -> "Más pesados"
+	SortOption.SIZE_ASC -> "Más livianos"
 }

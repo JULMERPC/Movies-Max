@@ -19,21 +19,22 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Gesture
-import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -59,7 +60,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.example.videomax.R
-import com.example.videomax.domain.model.AppLanguage
 import com.example.videomax.domain.model.AppSettings
 import com.example.videomax.domain.model.ThemeMode
 import com.example.videomax.domain.repository.SettingsRepository
@@ -98,10 +98,6 @@ class SettingsViewModel @Inject constructor(
 
 	fun setSeekStep(seconds: Int) {
 		viewModelScope.launch { settingsRepository.setSeekStepSeconds(seconds) }
-	}
-
-	fun setLanguage(language: AppLanguage) {
-		viewModelScope.launch { settingsRepository.setLanguage(language) }
 	}
 
 	fun setShowHiddenFiles(enabled: Boolean) {
@@ -168,57 +164,10 @@ fun SettingsScreen(
 				verticalArrangement = Arrangement.spacedBy(14.dp)
 			) {
 				GlassSection(title = stringResource(R.string.settings_appearance)) {
-					Text(
-						text = stringResource(R.string.settings_theme),
-						style = MaterialTheme.typography.labelLarge,
-						color = MaterialTheme.colorScheme.onSurfaceVariant
+					ThemeDropdown(
+						selected = settings.themeMode,
+						onSelected = viewModel::setTheme
 					)
-					Spacer(modifier = Modifier.height(8.dp))
-					SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-						ThemeMode.entries.forEachIndexed { index, mode ->
-							SegmentedButton(
-								selected = settings.themeMode == mode,
-								onClick = { viewModel.setTheme(mode) },
-								shape = SegmentedButtonDefaults.itemShape(
-									index = index,
-									count = ThemeMode.entries.size
-								),
-								label = {
-									Text(
-										when (mode) {
-											ThemeMode.SYSTEM -> stringResource(R.string.theme_system)
-											ThemeMode.LIGHT -> stringResource(R.string.theme_light)
-											ThemeMode.DARK -> stringResource(R.string.theme_dark)
-										}
-									)
-								}
-							)
-						}
-					}
-				}
-
-				GlassSection(title = stringResource(R.string.settings_language), icon = Icons.Default.Language) {
-					SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-						AppLanguage.entries.forEachIndexed { index, language ->
-							SegmentedButton(
-								selected = settings.language == language,
-								onClick = { viewModel.setLanguage(language) },
-								shape = SegmentedButtonDefaults.itemShape(
-									index = index,
-									count = AppLanguage.entries.size
-								),
-								label = {
-									Text(
-										when (language) {
-											AppLanguage.SYSTEM -> stringResource(R.string.lang_system)
-											AppLanguage.ENGLISH -> stringResource(R.string.lang_english)
-											AppLanguage.SPANISH -> stringResource(R.string.lang_spanish)
-										}
-									)
-								}
-							)
-						}
-					}
 				}
 
 				GlassSection(title = stringResource(R.string.settings_playback)) {
@@ -360,6 +309,66 @@ fun SettingsScreen(
 			},
 			containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
 		)
+	}
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ThemeDropdown(
+	selected: ThemeMode,
+	onSelected: (ThemeMode) -> Unit
+) {
+	var expanded by remember { mutableStateOf(false) }
+
+	val label = when (selected) {
+		ThemeMode.SYSTEM -> stringResource(R.string.theme_system)
+		ThemeMode.LIGHT -> stringResource(R.string.theme_light)
+		ThemeMode.DARK -> stringResource(R.string.theme_dark)
+	}
+
+	ExposedDropdownMenuBox(
+		expanded = expanded,
+		onExpandedChange = { expanded = it }
+	) {
+		OutlinedTextField(
+			value = label,
+			onValueChange = {},
+			readOnly = true,
+			label = { Text(stringResource(R.string.settings_theme)) },
+			trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+			modifier = Modifier
+				.fillMaxWidth()
+				.menuAnchor(MenuAnchorType.PrimaryNotEditable),
+			colors = OutlinedTextFieldDefaults.colors(
+				unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+				focusedTextColor = MaterialTheme.colorScheme.onSurface
+			)
+		)
+		ExposedDropdownMenu(
+			expanded = expanded,
+			onDismissRequest = { expanded = false }
+		) {
+			ThemeMode.entries.forEach { mode ->
+				val modeLabel = when (mode) {
+					ThemeMode.SYSTEM -> stringResource(R.string.theme_system)
+					ThemeMode.LIGHT -> stringResource(R.string.theme_light)
+					ThemeMode.DARK -> stringResource(R.string.theme_dark)
+				}
+				DropdownMenuItem(
+					text = {
+						Text(
+							text = modeLabel,
+							color = if (mode == selected) MaterialTheme.colorScheme.primary
+							else MaterialTheme.colorScheme.onSurface
+						)
+					},
+					onClick = {
+						onSelected(mode)
+						expanded = false
+					}
+				)
+			}
+		}
 	}
 }
 

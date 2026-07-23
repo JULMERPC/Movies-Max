@@ -19,6 +19,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import android.app.Activity
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun MediaPermissionGate(
@@ -61,9 +64,36 @@ fun MediaPermissionGate(
 	}
 }
 
+/**
+ * Returns the appropriate media permission string based on API level.
+ * - API 34+ (Android 14+): READ_MEDIA_VISUAL_USER_SELECTED (partial access)
+ * - API 33 (Android 13): READ_MEDIA_VIDEO
+ * - API 32 and below: READ_EXTERNAL_STORAGE
+ */
 fun requiredMediaPermission(): String =
-	if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-		Manifest.permission.READ_MEDIA_VIDEO
-	} else {
-		Manifest.permission.READ_EXTERNAL_STORAGE
+	when {
+		Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE ->
+			Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+		Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
+			Manifest.permission.READ_MEDIA_VIDEO
+		else ->
+			Manifest.permission.READ_EXTERNAL_STORAGE
 	}
+
+/**
+ * Checks if the app has sufficient media access permission.
+ * On Android 14+, READ_MEDIA_VISUAL_USER_SELECTED grants partial access.
+ * Also checks READ_MEDIA_VIDEO since it may be co-granted for full access.
+ */
+fun hasMediaPermission(activity: Activity): Boolean {
+	val selected = ContextCompat.checkSelfPermission(
+		activity, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+	) == android.content.pm.PackageManager.PERMISSION_GRANTED
+	val video = ContextCompat.checkSelfPermission(
+		activity, Manifest.permission.READ_MEDIA_VIDEO
+	) == android.content.pm.PackageManager.PERMISSION_GRANTED
+	val storage = ContextCompat.checkSelfPermission(
+		activity, Manifest.permission.READ_EXTERNAL_STORAGE
+	) == android.content.pm.PackageManager.PERMISSION_GRANTED
+	return selected || video || storage
+}

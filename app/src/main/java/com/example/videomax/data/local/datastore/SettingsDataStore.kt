@@ -9,7 +9,6 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.example.videomax.domain.model.AppLanguage
 import com.example.videomax.domain.model.AppSettings
 import com.example.videomax.domain.model.SortOption
 import com.example.videomax.domain.model.ThemeMode
@@ -34,7 +33,6 @@ class SettingsDataStore @Inject constructor(
 		val rememberPosition = booleanPreferencesKey("remember_position")
 		val autoPlayNext = booleanPreferencesKey("auto_play_next")
 		val seekStep = intPreferencesKey("seek_step_seconds")
-		val language = stringPreferencesKey("language")
 		val showHiddenFiles = booleanPreferencesKey("show_hidden_files")
 		val gesturesEnabled = booleanPreferencesKey("gestures_enabled")
 		val autoPip = booleanPreferencesKey("auto_pip")
@@ -53,9 +51,6 @@ class SettingsDataStore @Inject constructor(
 			rememberPlaybackPosition = prefs[Keys.rememberPosition] ?: true,
 			autoPlayNext = prefs[Keys.autoPlayNext] ?: false,
 			seekStepSeconds = prefs[Keys.seekStep] ?: 10,
-			language = prefs[Keys.language]?.let {
-				runCatching { AppLanguage.valueOf(it) }.getOrDefault(AppLanguage.SYSTEM)
-			} ?: AppLanguage.SYSTEM,
 			showHiddenFiles = prefs[Keys.showHiddenFiles] ?: false,
 			gesturesEnabled = prefs[Keys.gesturesEnabled] ?: true,
 			autoPip = prefs[Keys.autoPip] ?: false,
@@ -85,10 +80,6 @@ class SettingsDataStore @Inject constructor(
 
 	suspend fun setSeekStepSeconds(seconds: Int) {
 		context.settingsDataStore.edit { it[Keys.seekStep] = seconds }
-	}
-
-	suspend fun setLanguage(language: AppLanguage) {
-		context.settingsDataStore.edit { it[Keys.language] = language.name }
 	}
 
 	suspend fun setShowHiddenFiles(enabled: Boolean) {
@@ -130,11 +121,16 @@ class SettingsDataStore @Inject constructor(
 	}
 
 	private fun encodeBlacklist(entries: List<String>): String =
-		entries.joinToString("\u001F") { it.trim() }.trim()
+		org.json.JSONArray(entries.map { it.trim() }).toString()
 
-	private fun decodeBlacklist(raw: String?): List<String> =
-		raw?.split('\u001F')
-			?.map { it.trim() }
-			?.filter { it.isNotEmpty() }
-			.orEmpty()
+	private fun decodeBlacklist(raw: String?): List<String> {
+		if (raw.isNullOrBlank()) return emptyList()
+		return runCatching {
+			org.json.JSONArray(raw).let { arr ->
+				(0 until arr.length())
+					.mapNotNull { arr.optString(it, "").trim() }
+					.filter { it.isNotEmpty() }
+			}
+		}.getOrDefault(emptyList())
+	}
 }

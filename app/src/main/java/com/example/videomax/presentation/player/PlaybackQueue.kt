@@ -21,29 +21,22 @@ data class PlaybackQueueContext(
  * - **Eager** queues ([setQueue]): playlists, favorites, history — full ID list known up front.
  * - **Lazy** queues ([beginLazy]): library — starts with the selected ID and expands a window
  *   around the playhead on demand, matching professional players (VLC / MX / Nova).
+ *
+ * Thread-safety: all mutable state is guarded by [lock] to prevent race conditions
+ * when concurrent coroutines expand the window or navigate the queue.
  */
 @Singleton
 class PlaybackQueue @Inject constructor() {
 
-	@Volatile
+	private val lock = Any()
 	private var videoIds: MutableList<Long> = mutableListOf()
-
-	@Volatile
 	private var index: Int = 0
-
-	@Volatile
 	private var lazySession: Boolean = false
-
-	@Volatile
 	private var queueContext: PlaybackQueueContext? = null
-
-	@Volatile
 	private var hasMoreBefore: Boolean = false
-
-	@Volatile
 	private var hasMoreAfter: Boolean = false
 
-	fun setQueue(ids: List<Long>, startId: Long) {
+	fun setQueue(ids: List<Long>, startId: Long) = synchronized(lock) {
 		val distinct = ids.distinct()
 		lazySession = false
 		queueContext = null
@@ -61,23 +54,22 @@ class PlaybackQueue @Inject constructor() {
 	 * Starts a lazy library session with only the selected video.
 	 * The player must expand the window asynchronously.
 	 */
-	fun beginLazy(context: PlaybackQueueContext, startId: Long) {
+	fun beginLazy(context: PlaybackQueueContext, startId: Long) = synchronized(lock) {
 		lazySession = true
 		queueContext = context
 		videoIds = mutableListOf(startId)
 		index = 0
-		// Optimistic until the first window query resolves.
 		hasMoreBefore = true
 		hasMoreAfter = true
 	}
 
-	fun isLazy(): Boolean = lazySession
+	fun isLazy(): Boolean = synchronized(lock) { lazySession }
 
-	fun context(): PlaybackQueueContext? = queueContext
+	fun context(): PlaybackQueueContext? = synchronized(lock) { queueContext }
 
-	fun hasMoreBefore(): Boolean = hasMoreBefore
+	fun hasMoreBefore(): Boolean = synchronized(lock) { hasMoreBefore }
 
-	fun hasMoreAfter(): Boolean = hasMoreAfter
+	fun hasMoreAfter(): Boolean = synchronized(lock) { hasMoreAfter }
 
 	/**
 	 * Replaces the in-memory window after the first Room fetch around [startId].
@@ -87,7 +79,7 @@ class PlaybackQueue @Inject constructor() {
 		startId: Long,
 		moreBefore: Boolean,
 		moreAfter: Boolean
-	) {
+	) = synchronized(lock) {
 		val distinct = windowIds.distinct()
 		if (distinct.isEmpty()) {
 			videoIds = mutableListOf(startId)
@@ -101,84 +93,88 @@ class PlaybackQueue @Inject constructor() {
 	}
 
 	/** Prepends older-in-navigation items (appear earlier in sort order). */
-	fun prepend(ids: List<Long>, moreBefore: Boolean): Int {
+	fun prepend(ids: List<Long>, moreBefore: Boolean): Int = synchronized(lock) {
 		val fresh = ids.distinct().filter { it !in videoIds }
 		if (fresh.isNotEmpty()) {
 			videoIds.addAll(0, fresh)
 			index += fresh.size
 		}
 		hasMoreBefore = moreBefore
-		return fresh.size
+		fresh.size
 	}
 
 	/** Appends later-in-navigation items (appear later in sort order). */
-	fun append(ids: List<Long>, moreAfter: Boolean): Int {
+	fun append(ids: List<Long>, moreAfter: Boolean): Int = synchronized(lock) {
 		val fresh = ids.distinct().filter { it !in videoIds }
 		if (fresh.isNotEmpty()) {
 			videoIds.addAll(fresh)
 		}
 		hasMoreAfter = moreAfter
-		return fresh.size
+		fresh.size
 	}
 
-	fun needsExpandBefore(threshold: Int = EXPAND_THRESHOLD): Boolean =
+	fun needsExpandBefore(threshold: Int = EXPAND_THRESHOLD): Boolean = synchronized(lock) {
 		lazySession && hasMoreBefore && index < threshold
+	}
 
-	fun needsExpandAfter(threshold: Int = EXPAND_THRESHOLD): Boolean =
+	fun needsExpandAfter(threshold: Int = EXPAND_THRESHOLD): Boolean = synchronized(lock) {
 		lazySession && hasMoreAfter && (videoIds.size - index - 1) < threshold
+	}
 
-	fun setIndex(idx: Int) {
+	fun setIndex(idx: Int) = synchronized(lock) {
 		if (idx in videoIds.indices) {
 			index = idx
 		}
 	}
 
-	fun ensureSingle(videoId: Long) {
-		if (videoIds.isEmpty() || (currentId() != videoId && videoId !in videoIds)) {
+	fun ensureSingle(videoId: Long) = synchronized(lock) {
+		if (videoIds.isEmpty() || (currentIdLocked() != videoId && videoId !in videoIds)) {
 			if (lazySession && queueContext != null) {
 				beginLazy(queueContext!!, videoId)
 			} else {
 				setQueue(listOf(videoId), videoId)
 			}
-		} else if (currentId() != videoId) {
+		} else if (currentIdLocked() != videoId) {
 			val found = videoIds.indexOf(videoId)
 			if (found >= 0) index = found
 		}
 	}
 
-	fun currentId(): Long? = videoIds.getOrNull(index)
+	fun currentId(): Long? = synchronized(lock) { currentIdLocked() }
 
-	fun size(): Int = videoIds.size
+	private fun currentIdLocked(): Long? = videoIds.getOrNull(index)
 
-	fun currentIndex(): Int = index
+	fun size(): Int = synchronized(lock) { videoIds.size }
 
-	fun hasPrevious(): Boolean = index > 0 || (lazySession && hasMoreBefore)
+	fun currentIndex(): Int = synchronized(lock) { index }
 
-	fun hasNext(): Boolean = index < videoIds.lastIndex || (lazySession && hasMoreAfter)
+	fun hasPrevious(): Boolean = synchronized(lock) { index > 0 || (lazySession && hasMoreBefore) }
 
-	fun moveToPrevious(): Long? {
+	fun hasNext(): Boolean = synchronized(lock) { index < videoIds.lastIndex || (lazySession && hasMoreAfter) }
+
+	fun moveToPrevious(): Long? = synchronized(lock) {
 		if (index <= 0) return null
 		index -= 1
-		return currentId()
+		currentIdLocked()
 	}
 
-	fun moveToNext(): Long? {
+	fun moveToNext(): Long? = synchronized(lock) {
 		if (index >= videoIds.lastIndex) return null
 		index += 1
-		return currentId()
+		currentIdLocked()
 	}
 
-	fun moveToFirst(): Long? {
+	fun moveToFirst(): Long? = synchronized(lock) {
 		if (videoIds.isEmpty()) return null
 		index = 0
-		return currentId()
+		currentIdLocked()
 	}
 
-	fun ids(): List<Long> = videoIds.toList()
+	fun ids(): List<Long> = synchronized(lock) { videoIds.toList() }
 
-	fun firstId(): Long? = videoIds.firstOrNull()
+	fun firstId(): Long? = synchronized(lock) { videoIds.firstOrNull() }
 
-	fun lastId(): Long? = videoIds.lastOrNull()
+	fun lastId(): Long? = synchronized(lock) { videoIds.lastOrNull() }
 
 	companion object {
 		const val WINDOW_BEFORE = 12

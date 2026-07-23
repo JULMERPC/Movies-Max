@@ -22,8 +22,11 @@ import com.example.videomax.domain.usecase.ToggleFavoriteUseCase
 import com.example.videomax.domain.repository.VideoRepository
 import com.example.videomax.util.SubtitleHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,7 +34,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -100,6 +102,13 @@ class PlayerViewModel @Inject constructor(
 	/** Session cache: videoId → sidecar tracks (avoids re-scanning the same file). */
 	private val subtitleCache = mutableMapOf<Long, List<SubtitleTrack>>()
 	private var subtitleLoadJob: Job? = null
+	/** Eagerly-saved position for onCleared — avoids runBlocking on the main thread. */
+	@Volatile
+	private var lastPersistedPositionMs: Long = 0L
+	@Volatile
+	private var lastPersistedVideoId: Long = 0L
+	/** Non-cancellable scope for final cleanup work in onCleared. */
+	private val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
 	private val playerListener = object : Player.Listener {
 		override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -123,9 +132,11 @@ class PlayerViewModel @Inject constructor(
 							player.seekTo(0L)
 							player.play()
 						}
-						QueueRepeatMode.ALL -> playNextInternal()
+						QueueRepeatMode.ALL -> {
+							if (settings.autoPlayNext) playNextInternal()
+						}
 						QueueRepeatMode.OFF -> {
-							if (player.hasNextMediaItem() || playbackQueue.hasNext()) {
+							if (settings.autoPlayNext && (player.hasNextMediaItem() || playbackQueue.hasNext())) {
 								playNextInternal()
 							} else {
 								_uiState.update { it.copy(isPlaying = false, controlsVisible = true) }
@@ -810,6 +821,19 @@ class PlayerViewModel @Inject constructor(
 
 	fun seekStepMs(): Long = settings.seekStepSeconds * 1000L
 
+	/**
+	 * Pauses playback and persists the current position.
+	 * Called when the player screen goes to background (ON_STOP) or is being destroyed.
+	 */
+	fun pauseAndPersist() {
+		if (player.isPlaying) {
+			player.pause()
+		}
+		viewModelScope.launch {
+			runCatching { persistProgress() }
+		}
+	}
+
 	private fun scheduleHideControls() {
 		hideControlsJob?.cancel()
 		hideControlsJob = viewModelScope.launch {
@@ -829,18 +853,41 @@ class PlayerViewModel @Inject constructor(
 		val position = player.currentPosition.coerceAtLeast(0L)
 		val duration = player.duration.coerceAtLeast(0L)
 		if (duration <= 0L) return
+		val effectivePosition = if (position > duration - 3_000) 0L else position
+		// Cache for onCleared safety.
+		lastPersistedVideoId = video.id
+		lastPersistedPositionMs = effectivePosition
 		saveProgress(
 			videoId = video.id,
 			videoUri = video.uri,
 			displayName = video.displayName,
-			positionMs = if (position > duration - 3_000) 0L else position,
+			positionMs = effectivePosition,
 			durationMs = duration
 		)
 	}
 
 	override fun onCleared() {
-		runBlocking {
-			runCatching { persistProgress() }
+		// Persist position without blocking the main thread.
+		val videoId = lastPersistedVideoId
+		val position = lastPersistedPositionMs
+		if (videoId > 0) {
+			cleanupScope.launch {
+				runCatching {
+					val video = _uiState.value.video
+					if (video != null && video.id == videoId) {
+						val duration = player.duration.coerceAtLeast(0L)
+						if (duration > 0L) {
+							saveProgress(
+								videoId = video.id,
+								videoUri = video.uri,
+								displayName = video.displayName,
+								positionMs = position,
+								durationMs = duration
+							)
+						}
+					}
+				}
+			}
 		}
 		subtitleLoadJob?.cancel()
 		subtitleCache.clear()
@@ -850,8 +897,15 @@ class PlayerViewModel @Inject constructor(
 		player.removeListener(playerListener)
 		player.stop()
 		player.clearMediaItems()
+		cleanupScope.cancel()
 		super.onCleared()
 	}
+
+	fun getQueueIds(): List<Long> = playbackQueue.ids()
+
+	fun getCurrentQueueIndex(): Int = playbackQueue.currentIndex()
+
+	fun getCurrentVideoId(): Long? = playbackQueue.currentId()
 
 	private companion object {
 		const val PROGRESS_POLL_MS = 500L

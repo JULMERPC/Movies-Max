@@ -29,6 +29,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+enum class LibraryFilterMode {
+	ALL_VIDEOS,
+	ALL_FOLDERS,
+	FOLDER_TREE
+}
+
 data class LibraryUiState(
 	val folders: List<String> = emptyList(),
 	val videoCount: Int = 0,
@@ -38,6 +44,8 @@ data class LibraryUiState(
 	val scanProgress: Float = 0f,
 	val isGrid: Boolean = true,
 	val selectedFolder: String? = null,
+	val filterMode: LibraryFilterMode = LibraryFilterMode.ALL_VIDEOS,
+	val isSearchOpen: Boolean = false,
 	val message: String? = null
 )
 
@@ -59,6 +67,8 @@ class LibraryViewModel @Inject constructor(
 	private val scanProgress = MutableStateFlow(0f)
 	private val isGrid = MutableStateFlow(true)
 	private val selectedFolder = MutableStateFlow<String?>(null)
+	private val filterMode = MutableStateFlow(LibraryFilterMode.ALL_VIDEOS)
+	private val isSearchOpen = MutableStateFlow(false)
 	private val message = MutableStateFlow<String?>(null)
 
 	@OptIn(kotlinx.coroutines.FlowPreview::class)
@@ -77,17 +87,19 @@ class LibraryViewModel @Inject constructor(
 		LayoutControls(scanning, progress, grid, folder)
 	}
 
-	private val controls = combine(query, sortOption, layoutControls) { q, sort, layout ->
+	private val controls = combine(query, sortOption, layoutControls, filterMode, isSearchOpen) {
+			q, sort, layout, mode, searchOpen ->
 		LibraryControls(
 			query = q,
 			sortOption = sort,
 			isScanning = layout.isScanning,
 			scanProgress = layout.scanProgress,
 			isGrid = layout.isGrid,
-			selectedFolder = layout.selectedFolder
+			selectedFolder = layout.selectedFolder,
+			filterMode = mode,
+			isSearchOpen = searchOpen
 		)
 	}
-
 
 	val uiState: StateFlow<LibraryUiState> = combine(
 		videoRepository.observeFolders(),
@@ -104,6 +116,8 @@ class LibraryViewModel @Inject constructor(
 			scanProgress = ctrl.scanProgress,
 			isGrid = ctrl.isGrid,
 			selectedFolder = ctrl.selectedFolder,
+			filterMode = ctrl.filterMode,
+			isSearchOpen = ctrl.isSearchOpen,
 			message = msg
 		)
 	}.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryUiState())
@@ -132,6 +146,20 @@ class LibraryViewModel @Inject constructor(
 
 	fun selectFolder(folder: String?) {
 		selectedFolder.value = folder
+		query.value = ""
+	}
+
+	fun setFilterMode(mode: LibraryFilterMode) {
+		filterMode.value = mode
+		if (mode != LibraryFilterMode.ALL_VIDEOS) {
+			selectedFolder.value = null
+		}
+		query.value = ""
+	}
+
+	fun toggleSearch() {
+		isSearchOpen.update { !it }
+		if (!isSearchOpen.value) query.value = ""
 	}
 
 	fun refresh() {
@@ -171,12 +199,11 @@ class LibraryViewModel @Inject constructor(
 	}
 
 	suspend fun preparePlayback(videoId: Long) {
-		// Lazy queue: do not load all library IDs. Player expands a window on demand.
 		playbackQueue.beginLazy(
 			context = PlaybackQueueContext(
 				query = query.value,
 				sortOption = sortOption.value,
-				folder = selectedFolder.value
+				folder = if (filterMode.value == LibraryFilterMode.ALL_VIDEOS) null else selectedFolder.value
 			),
 			startId = videoId
 		)
@@ -195,7 +222,9 @@ class LibraryViewModel @Inject constructor(
 		val isScanning: Boolean,
 		val scanProgress: Float,
 		val isGrid: Boolean,
-		val selectedFolder: String?
+		val selectedFolder: String?,
+		val filterMode: LibraryFilterMode,
+		val isSearchOpen: Boolean
 	)
 
 	private companion object {

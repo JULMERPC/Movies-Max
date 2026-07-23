@@ -1,15 +1,8 @@
 package com.example.videomax.presentation.player
 
 import android.app.Activity
-import android.app.PictureInPictureParams
-import android.graphics.Bitmap
-import android.media.AudioManager
 import android.net.Uri
-import android.os.Build
-import android.os.Handler
-import android.os.Looper
-import android.util.Rational
-import android.view.PixelCopy
+import android.widget.Toast
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -26,45 +19,30 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.AspectRatio
-import androidx.compose.material.icons.filled.Camera
-import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LockOpen
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.ScreenRotation
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -72,7 +50,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -90,40 +67,26 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
-import com.example.videomax.util.Formatters
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/**
- * Modern, minimal, fluid player screen.
- *
- * NOTE: This screen expects the following members on [PlayerViewModel] / [PlayerUiState]
- * beyond what previously existed, since the new controls need them:
- *   - state.isMuted: Boolean
- *   - viewModel.toggleMute()
- *   - viewModel.zoomScale: Float / viewModel.setZoom(scale: Float) (or keep zoom purely local, as done below)
- *   - onOpenQueue / onCast: wire these to your own queue sheet and cast session as needed.
- * If any of these aren't present yet in your ViewModel, add them — the calls below are
- * written against the names used elsewhere in this file for consistency.
- */
 @Composable
-fun PlayerScreen(
+	fun PlayerScreen(
 	onBack: () -> Unit,
 	onOpenDetails: (Long) -> Unit,
-	onOpenQueue: () -> Unit = {},
-	onCast: () -> Unit = {},
 	viewModel: PlayerViewModel = hiltViewModel()
 ) {
 	val state by viewModel.uiState.collectAsStateWithLifecycle()
 	val context = LocalContext.current
 	val activity = context as Activity
-	val audioManager = remember { context.getSystemService(AudioManager::class.java) }
+	val audioManager = remember { context.getSystemService(android.media.AudioManager::class.java) }
 	val scope = rememberCoroutineScope()
 
-	var resizeMode by remember { androidx.compose.runtime.mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) }
+	var resizeMode by remember { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) }
 	var dragAccum by remember { mutableFloatStateOf(0f) }
 	var zoomScale by remember { mutableFloatStateOf(1f) }
 	var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
+	var showQueueSheet by remember { mutableStateOf(false) }
 
 	val subtitlePicker = rememberLauncherForActivityResult(
 		ActivityResultContracts.OpenDocument()
@@ -137,35 +100,8 @@ fun PlayerScreen(
 		}
 	}
 
-	DisposableEffect(Unit) {
-		val window = activity.window
-		val controller = WindowCompat.getInsetsController(window, window.decorView)
-		val previousOrientation = activity.requestedOrientation
-		WindowCompat.setDecorFitsSystemWindows(window, false)
-		controller.hide(WindowInsetsCompat.Type.systemBars())
-		controller.systemBarsBehavior =
-			WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-		window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-
-		val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
-		val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-		viewModel.setVolumeFraction(currentVolume / maxVolume.toFloat(), fromGesture = false)
-
-		val lp = window.attributes
-		if (lp.screenBrightness >= 0f) {
-			viewModel.syncBrightnessWithoutHint(lp.screenBrightness)
-		}
-
-		onDispose {
-			scope.launch { viewModel.persistProgress() }
-			activity.requestedOrientation = previousOrientation
-			controller.show(WindowInsetsCompat.Type.systemBars())
-			window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-			val attrs = window.attributes
-			attrs.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-			window.attributes = attrs
-		}
-	}
+	SetupSystemBars(activity, audioManager, viewModel, scope)
+	SetupLifecyclePauser(activity, viewModel, state)
 
 	LaunchedEffect(state.orientation) {
 		activity.requestedOrientation = when (state.orientation) {
@@ -183,9 +119,9 @@ fun PlayerScreen(
 	}
 
 	LaunchedEffect(state.volumeFraction) {
-		val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+		val max = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
 		audioManager.setStreamVolume(
-			AudioManager.STREAM_MUSIC,
+			android.media.AudioManager.STREAM_MUSIC,
 			(state.volumeFraction * max).toInt().coerceIn(0, max),
 			0
 		)
@@ -198,7 +134,198 @@ fun PlayerScreen(
 		}
 	}
 
-	val nextEnabled = state.hasNext || state.repeatMode != QueueRepeatMode.OFF
+	SetupAutoPip(activity, state)
+
+	val brightnessRef = rememberUpdatedState(state.brightness)
+	val volumeRef = rememberUpdatedState(state.volumeFraction)
+	val gesturesRef = rememberUpdatedState(state.gesturesEnabled)
+
+	val animatedZoom by animateFloatAsState(
+		targetValue = zoomScale,
+		animationSpec = tween(150),
+		label = "zoom"
+	)
+
+	Box(
+		modifier = Modifier
+			.fillMaxSize()
+			.background(Color.Black)
+	) {
+		PlayerVideoSurface(
+			viewModel = viewModel,
+			resizeMode = resizeMode,
+			animatedZoom = animatedZoom,
+			state = state,
+			dragAccum = dragAccum,
+			brightnessRef = brightnessRef,
+			volumeRef = volumeRef,
+			gesturesRef = gesturesRef,
+			onDragAccumChange = { dragAccum = it },
+			onZoomChange = { zoomScale = it },
+			onPlayerViewRef = { playerViewRef = it }
+		)
+
+		PlayerGestureHint(
+			hint = state.gestureHint,
+			modifier = Modifier.align(Alignment.Center)
+		)
+
+		AnimatedVisibility(
+			visible = state.controlsVisible,
+			enter = fadeIn(tween(220)),
+			exit = fadeOut(tween(220))
+		) {
+			PlayerControlsOverlay(
+				state = state,
+				viewModel = viewModel,
+				activity = activity,
+				playerViewRef = playerViewRef,
+				resizeMode = resizeMode,
+				scope = scope,
+				onBack = onBack,
+				onOpenQueue = { showQueueSheet = true },
+				onScreenshot = {
+					captureFrame(activity, playerViewRef) { bitmap ->
+						if (bitmap != null && saveBitmapToGallery(activity, bitmap)) {
+							scope.launch {
+								Toast.makeText(context, "Captura guardada en Galería", Toast.LENGTH_SHORT).show()
+							}
+						} else {
+							scope.launch {
+								Toast.makeText(context, "Error al guardar captura", Toast.LENGTH_SHORT).show()
+							}
+						}
+					}
+				},
+				onCast = {
+					Toast.makeText(context, "Función próximamente", Toast.LENGTH_SHORT).show()
+				},
+				onResizeModeChange = { resizeMode = it }
+			)
+		}
+	}
+
+	if (showQueueSheet) {
+		PlayerQueueSheet(
+			viewModel = viewModel,
+			onDismiss = { showQueueSheet = false }
+		)
+	}
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlayerQueueSheet(
+	viewModel: PlayerViewModel,
+	onDismiss: () -> Unit
+) {
+	val sheetState = rememberModalBottomSheetState()
+	val queueIds = viewModel.getQueueIds()
+	val currentIndex = viewModel.getCurrentQueueIndex()
+	val currentVideoId = viewModel.getCurrentVideoId()
+
+	ModalBottomSheet(
+		onDismissRequest = onDismiss,
+		sheetState = sheetState,
+		containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+	) {
+		Column(
+			modifier = Modifier
+				.fillMaxWidth()
+				.padding(bottom = 32.dp)
+		) {
+			Text(
+				text = "Cola de reproducción",
+				style = MaterialTheme.typography.titleMedium,
+				modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+			)
+			if (queueIds.isEmpty()) {
+				Text(
+					text = "Cola vacía",
+					style = MaterialTheme.typography.bodyMedium,
+					color = MaterialTheme.colorScheme.onSurfaceVariant,
+					modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
+				)
+			} else {
+				androidx.compose.foundation.lazy.LazyColumn(
+					modifier = Modifier.fillMaxWidth()
+				) {
+					items(queueIds.size) { index ->
+						val videoId = queueIds[index]
+						val isCurrent = videoId == currentVideoId
+						androidx.compose.foundation.layout.Row(
+							modifier = Modifier
+								.fillMaxWidth()
+								.background(
+									if (isCurrent) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+									else Color.Transparent
+								)
+								.padding(horizontal = 20.dp, vertical = 12.dp),
+							verticalAlignment = Alignment.CenterVertically
+						) {
+							Text(
+								text = "${index + 1}",
+								style = MaterialTheme.typography.labelMedium,
+								color = if (isCurrent) MaterialTheme.colorScheme.primary
+								else MaterialTheme.colorScheme.onSurfaceVariant,
+								modifier = Modifier.width(32.dp)
+							)
+							Text(
+								text = "Video $videoId",
+								style = MaterialTheme.typography.bodyMedium,
+								color = if (isCurrent) MaterialTheme.colorScheme.primary
+								else MaterialTheme.colorScheme.onSurface,
+								maxLines = 1,
+								modifier = Modifier.weight(1f)
+							)
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+@Composable
+private fun SetupSystemBars(
+	activity: Activity,
+	audioManager: android.media.AudioManager,
+	viewModel: PlayerViewModel,
+	scope: kotlinx.coroutines.CoroutineScope
+) {
+	DisposableEffect(Unit) {
+		val window = activity.window
+		val controller = WindowCompat.getInsetsController(window, window.decorView)
+		val previousOrientation = activity.requestedOrientation
+		WindowCompat.setDecorFitsSystemWindows(window, false)
+		controller.hide(WindowInsetsCompat.Type.systemBars())
+		controller.systemBarsBehavior =
+			WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+		window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+		val maxVolume = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+		val currentVolume = audioManager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
+		viewModel.setVolumeFraction(currentVolume / maxVolume.toFloat(), fromGesture = false)
+
+		val lp = window.attributes
+		if (lp.screenBrightness >= 0f) {
+			viewModel.syncBrightnessWithoutHint(lp.screenBrightness)
+		}
+
+		onDispose {
+			scope.launch { viewModel.persistProgress() }
+			activity.requestedOrientation = previousOrientation
+			controller.show(WindowInsetsCompat.Type.systemBars())
+			window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+			val attrs = window.attributes
+			attrs.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+			window.attributes = attrs
+		}
+	}
+}
+
+@Composable
+private fun SetupAutoPip(activity: Activity, state: PlayerUiState) {
 	val lifecycleOwner = LocalLifecycleOwner.current
 	val latestAutoPip by rememberUpdatedState(state.autoPip)
 	val latestIsPlaying by rememberUpdatedState(state.isPlaying)
@@ -218,475 +345,262 @@ fun PlayerScreen(
 		lifecycleOwner.lifecycle.addObserver(observer)
 		onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
 	}
+}
 
-	val brightnessRef = rememberUpdatedState(state.brightness)
-	val volumeRef = rememberUpdatedState(state.volumeFraction)
-	val lockedRef = rememberUpdatedState(state.isLocked)
-	val gesturesRef = rememberUpdatedState(state.gesturesEnabled)
+/**
+ * Pauses the player and persists position when the Activity goes to background (ON_STOP)
+ * or is being destroyed (ON_DESTROY). Prevents audio/video from playing in background.
+ * If autoPiP is enabled, ON_STOP is deferred briefly to allow PiP transition to complete.
+ * ON_DESTROY always cleans up as a safety net.
+ */
+@Composable
+private fun SetupLifecyclePauser(activity: Activity, viewModel: PlayerViewModel, state: PlayerUiState) {
+	val lifecycleOwner = LocalLifecycleOwner.current
+	val latestAutoPip by rememberUpdatedState(state.autoPip)
+	val scope = rememberCoroutineScope()
 
-	val animatedZoom by animateFloatAsState(
-		targetValue = zoomScale,
-		animationSpec = tween(150),
-		label = "zoom"
-	)
+	DisposableEffect(lifecycleOwner) {
+		val observer = LifecycleEventObserver { _, event ->
+			when (event) {
+				Lifecycle.Event.ON_STOP -> {
+					if (latestAutoPip) {
+						// Give PiP transition time to activate; if it didn't, pause anyway.
+						scope.launch {
+							delay(300)
+							if (!activity.isInPictureInPictureMode) {
+								viewModel.pauseAndPersist()
+							}
+						}
+					} else {
+						viewModel.pauseAndPersist()
+					}
+				}
+				Lifecycle.Event.ON_DESTROY -> {
+					viewModel.pauseAndPersist()
+				}
+				else -> { /* no-op */ }
+			}
+		}
+		lifecycleOwner.lifecycle.addObserver(observer)
+		onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+	}
+}
 
-	Box(
+@Composable
+private fun PlayerVideoSurface(
+	viewModel: PlayerViewModel,
+	resizeMode: Int,
+	animatedZoom: Float,
+	state: PlayerUiState,
+	dragAccum: Float,
+	brightnessRef: androidx.compose.runtime.State<Float>,
+	volumeRef: androidx.compose.runtime.State<Float>,
+	gesturesRef: androidx.compose.runtime.State<Boolean>,
+	onDragAccumChange: (Float) -> Unit,
+	onZoomChange: (Float) -> Unit,
+	onPlayerViewRef: (PlayerView) -> Unit
+) {
+	var localDragAccum by remember { mutableFloatStateOf(dragAccum) }
+	var localZoom by remember { mutableFloatStateOf(1f) }
+
+	AndroidView(
+		factory = { ctx ->
+			PlayerView(ctx).apply {
+				player = viewModel.player
+				useController = false
+				this.resizeMode = resizeMode
+				setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+				onPlayerViewRef(this)
+			}
+		},
+		update = { it.resizeMode = resizeMode },
 		modifier = Modifier
 			.fillMaxSize()
-			.background(Color.Black)
-	) {
-		AndroidView(
-			factory = { ctx ->
-				PlayerView(ctx).apply {
-					player = viewModel.player
-					useController = false
-					this.resizeMode = resizeMode
-					setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
-					playerViewRef = this
-				}
-			},
-			update = { it.resizeMode = resizeMode },
-			modifier = Modifier
-				.fillMaxSize()
-				.scale(animatedZoom)
-				.pointerInput(Unit) {
-					detectTapGestures(
-						onTap = { viewModel.toggleControls() },
-						onDoubleTap = { offset ->
-							if (lockedRef.value) return@detectTapGestures
-							val third = size.width / 3f
-							when {
-								offset.x < third -> viewModel.seekBy(-viewModel.seekStepMs())
-								offset.x > third * 2 -> viewModel.seekBy(viewModel.seekStepMs())
-								else -> viewModel.togglePlayPause()
-							}
-						}
-					)
-				}
-				.then(
-					if (state.isLocked) Modifier
-					else Modifier.pointerInput(Unit) {
-						detectTransformGestures { _, _, zoom, _ ->
-							zoomScale = (zoomScale * zoom).coerceIn(1f, 3f)
+			.scale(animatedZoom)
+			.pointerInput(Unit) {
+				detectTapGestures(
+					onTap = { viewModel.toggleControls() },
+					onDoubleTap = { offset ->
+						if (state.isLocked) return@detectTapGestures
+						val third = size.width / 3f
+						when {
+							offset.x < third -> viewModel.seekBy(-viewModel.seekStepMs())
+							offset.x > third * 2 -> viewModel.seekBy(viewModel.seekStepMs())
+							else -> viewModel.togglePlayPause()
 						}
 					}
 				)
-				.then(
-					if (state.isLocked || !state.gesturesEnabled) Modifier
-					else Modifier
-						.pointerInput(Unit) {
-							detectVerticalDragGestures(
-								onDragEnd = { dragAccum = 0f },
-								onVerticalDrag = { change, dragAmount ->
-									change.consume()
-									val isLeft = change.position.x < size.width / 2f
-									val delta = -dragAmount / size.height.toFloat()
-									if (isLeft) {
-										// Left side vertical swipe -> brightness
-										viewModel.setBrightness(
-											brightnessRef.value + delta,
-											fromGesture = true
-										)
-									} else {
-										// Right side vertical swipe -> volume
-										viewModel.setVolumeFraction(
-											volumeRef.value + delta,
-											fromGesture = true
-										)
-									}
-								}
-							)
-						}
-						.pointerInput(Unit) {
-							detectHorizontalDragGestures(
-								onDragEnd = { dragAccum = 0f },
-								onHorizontalDrag = { change, dragAmount ->
-									change.consume()
-									if (lockedRef.value || !gesturesRef.value) return@detectHorizontalDragGestures
-									dragAccum += dragAmount
-									val seekDelta = (dragAccum / size.width * 90_000).toLong()
-									if (kotlin.math.abs(seekDelta) > 500) {
-										viewModel.seekBy(seekDelta)
-										dragAccum = 0f
-									}
-								}
-							)
-						}
-				)
-		)
-
-		PlayerGestureHint(
-			hint = state.gestureHint,
-			modifier = Modifier.align(Alignment.Center)
-		)
-
-		AnimatedVisibility(
-			visible = state.controlsVisible,
-			enter = fadeIn(tween(220)),
-			exit = fadeOut(tween(220))
-		) {
-			Box(modifier = Modifier.fillMaxSize()) {
-				AnimatedVisibility(
-					visible = true,
-					enter = fadeIn(tween(220)) + slideInVertically(tween(220)) { -it / 2 },
-					exit = fadeOut(tween(220)) + slideOutVertically(tween(220)) { -it / 2 },
-					modifier = Modifier.align(Alignment.TopCenter)
-				) {
-					PlayerTopBar(
-						fileName = state.video?.displayName.orEmpty(),
-						isMuted = state.volumeFraction <= 0f,
-						onBack = {
-							scope.launch {
-								viewModel.persistProgress()
-								onBack()
-							}
-						},
-						onOpenQueue = onOpenQueue,
-						onCycleOrientation = viewModel::cycleOrientation,
-						onToggleMute = {
-							if (state.volumeFraction > 0f) {
-								viewModel.setVolumeFraction(0f, fromGesture = false)
-							} else {
-								viewModel.setVolumeFraction(0.5f, fromGesture = false)
-							}
-						},
-						onScreenshot = {
-							captureFrame(activity, playerViewRef) { /* bitmap saved via callback below */ }
-						},
-						onCast = onCast
-					)
-				}
-
-				if (!state.isLocked) {
-					AnimatedVisibility(
-						visible = true,
-						enter = fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 2 },
-						exit = fadeOut(tween(220)) + slideOutVertically(tween(220)) { it / 2 },
-						modifier = Modifier.align(Alignment.BottomCenter)
-					) {
-						Column(
-							modifier = Modifier
-								.fillMaxWidth()
-								.background(
-									Brush.verticalGradient(
-										listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f))
-									)
-								)
-								.navigationBarsPadding()
-								.padding(horizontal = 14.dp, vertical = 6.dp)
-						) {
-							PlayerTimelineBar(
-								progressState = viewModel.progressState,
-								onSeekFraction = { fraction ->
-									val duration = viewModel.progressState.value.durationMs
-									if (duration > 0) {
-										viewModel.seekTo((fraction * duration).toLong())
-									}
-								}
-							)
-
-							PlayerTransportRow(
-								isPlaying = state.isPlaying,
-								isLocked = state.isLocked,
-								nextEnabled = nextEnabled,
-								onPrevious = viewModel::playPrevious,
-								onNext = viewModel::playNext,
-								onTogglePlayPause = viewModel::togglePlayPause,
-								onToggleLock = viewModel::toggleLock,
-								onCycleResize = {
-									resizeMode = when (resizeMode) {
-										AspectRatioFrameLayout.RESIZE_MODE_FIT ->
-											AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-										AspectRatioFrameLayout.RESIZE_MODE_ZOOM ->
-											AspectRatioFrameLayout.RESIZE_MODE_FILL
-										else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
-									}
-								}
-							)
-						}
-					}
-				} else if (state.controlsVisible) {
-					Text(
-						text = "Pantalla bloqueada — toca el candado para desbloquear",
-						color = Color.White.copy(alpha = 0.8f),
-						style = MaterialTheme.typography.labelMedium,
-						modifier = Modifier
-							.align(Alignment.BottomCenter)
-							.navigationBarsPadding()
-							.padding(16.dp)
-					)
-					IconButton(
-						onClick = viewModel::toggleLock,
-						modifier = Modifier
-							.align(Alignment.CenterEnd)
-							.padding(24.dp)
-							.size(48.dp)
-							.background(Color.Black.copy(alpha = 0.45f), CircleShape)
-					) {
-						Icon(Icons.Default.Lock, "Desbloquear", tint = Color.White)
-					}
-				}
 			}
-		}
-	}
+			.then(
+				if (state.isLocked) Modifier
+				else Modifier.pointerInput(Unit) {
+					detectTransformGestures { _, _, zoom, _ ->
+						localZoom = (localZoom * zoom).coerceIn(1f, 3f)
+						onZoomChange(localZoom)
+					}
+				}
+			)
+			.then(
+				if (state.isLocked || !state.gesturesEnabled) Modifier
+				else Modifier
+					.pointerInput(Unit) {
+						detectVerticalDragGestures(
+							onDragEnd = { localDragAccum = 0f; onDragAccumChange(0f) },
+							onVerticalDrag = { change, dragAmount ->
+								change.consume()
+								val isLeft = change.position.x < size.width / 2f
+								val delta = -dragAmount / size.height.toFloat()
+								if (isLeft) {
+									viewModel.setBrightness(
+										brightnessRef.value + delta,
+										fromGesture = true
+									)
+								} else {
+									viewModel.setVolumeFraction(
+										volumeRef.value + delta,
+										fromGesture = true
+									)
+								}
+							}
+						)
+					}
+					.pointerInput(Unit) {
+						detectHorizontalDragGestures(
+							onDragEnd = { localDragAccum = 0f; onDragAccumChange(0f) },
+							onHorizontalDrag = { change, dragAmount ->
+								change.consume()
+								if (state.isLocked || !gesturesRef.value) return@detectHorizontalDragGestures
+								localDragAccum += dragAmount
+								onDragAccumChange(localDragAccum)
+								val seekDelta = (localDragAccum / size.width * 90_000).toLong()
+								if (kotlin.math.abs(seekDelta) > 500) {
+									viewModel.seekBy(seekDelta)
+									localDragAccum = 0f
+									onDragAccumChange(0f)
+								}
+							}
+						)
+					}
+			)
+	)
 }
 
 @Composable
-private fun PlayerGestureHint(
-	hint: String?,
-	modifier: Modifier = Modifier
-) {
-	AnimatedVisibility(
-		visible = hint != null,
-		enter = fadeIn(tween(150)),
-		exit = fadeOut(tween(150)),
-		modifier = modifier
-	) {
-		Text(
-			text = hint.orEmpty(),
-			color = Color.White,
-			style = MaterialTheme.typography.titleLarge,
-			modifier = Modifier
-				.background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(14.dp))
-				.padding(horizontal = 20.dp, vertical = 12.dp)
-		)
-	}
-}
-
-/**
- * Top bar: back, queue/list, centered filename, rotate, mute, screenshot, cast.
- */
-@Composable
-private fun PlayerTopBar(
-	fileName: String,
-	isMuted: Boolean,
+private fun PlayerControlsOverlay(
+	state: PlayerUiState,
+	viewModel: PlayerViewModel,
+	activity: Activity,
+	playerViewRef: PlayerView?,
+	resizeMode: Int,
+	scope: kotlinx.coroutines.CoroutineScope,
 	onBack: () -> Unit,
 	onOpenQueue: () -> Unit,
-	onCycleOrientation: () -> Unit,
-	onToggleMute: () -> Unit,
 	onScreenshot: () -> Unit,
-	onCast: () -> Unit
+	onCast: () -> Unit,
+	onResizeModeChange: (Int) -> Unit
 ) {
-	Row(
-		verticalAlignment = Alignment.CenterVertically,
-		modifier = Modifier
-			.fillMaxWidth()
-			.background(
-				Brush.verticalGradient(
-					listOf(Color.Black.copy(alpha = 0.55f), Color.Transparent)
-				)
-			)
-			.statusBarsPadding()
-			.padding(horizontal = 4.dp, vertical = 2.dp)
-	) {
-		RippleIconButton(onClick = onBack) {
-			Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver", tint = Color.White, modifier = Modifier.size(22.dp))
-		}
-		RippleIconButton(onClick = onOpenQueue) {
-			Icon(Icons.AutoMirrored.Filled.List, "Lista", tint = Color.White, modifier = Modifier.size(20.dp))
-		}
-		Text(
-			text = fileName,
-			color = Color.White,
-			style = MaterialTheme.typography.labelLarge,
-			maxLines = 1,
-			modifier = Modifier
-				.weight(1f)
-				.padding(horizontal = 6.dp)
-		)
-		RippleIconButton(onClick = onCycleOrientation) {
-			Icon(Icons.Default.ScreenRotation, "Rotar", tint = Color.White, modifier = Modifier.size(20.dp))
-		}
-		RippleIconButton(onClick = onToggleMute) {
-			Icon(
-				if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
-				"Silenciar",
-				tint = Color.White,
-				modifier = Modifier.size(20.dp)
-			)
-		}
-		RippleIconButton(onClick = onScreenshot) {
-			Icon(Icons.Default.Camera, "Captura", tint = Color.White, modifier = Modifier.size(20.dp))
-		}
-		RippleIconButton(onClick = onCast) {
-			Icon(Icons.Default.Cast, "Cast", tint = Color.White, modifier = Modifier.size(20.dp))
-		}
-	}
-}
+	val nextEnabled = state.hasNext || state.repeatMode != QueueRepeatMode.OFF
 
-/**
- * Progress row: current time, animated draggable slider with white thumb, total duration.
- */
-@Composable
-private fun PlayerTimelineBar(
-	progressState: StateFlow<PlayerProgressState>,
-	onSeekFraction: (Float) -> Unit
-) {
-	val progress by progressState.collectAsStateWithLifecycle()
-	val duration = progress.durationMs
-	val position = progress.positionMs
-
-	val fraction = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
-	val animatedFraction by animateFloatAsState(
-		targetValue = fraction,
-		animationSpec = tween(180),
-		label = "progress"
-	)
-
-	Row(
-		verticalAlignment = Alignment.CenterVertically,
-		modifier = Modifier.padding(bottom = 2.dp)
-	) {
-		Text(
-			Formatters.formatDuration(position),
-			color = Color.White.copy(alpha = 0.9f),
-			style = MaterialTheme.typography.labelSmall
-		)
-		Slider(
-			value = animatedFraction,
-			onValueChange = onSeekFraction,
-			modifier = Modifier
-				.weight(1f)
-				.padding(horizontal = 8.dp),
-			colors = SliderDefaults.colors(
-				thumbColor = Color.White,
-				activeTrackColor = Color.White,
-				inactiveTrackColor = Color.White.copy(alpha = 0.28f)
-			)
-		)
-		Text(
-			Formatters.formatDuration(duration),
-			color = Color.White.copy(alpha = 0.9f),
-			style = MaterialTheme.typography.labelSmall
-		)
-	}
-}
-
-/**
- * Below the progress bar: lock, previous, big play/pause, next, screen-size toggle.
- */
-@Composable
-private fun PlayerTransportRow(
-	isPlaying: Boolean,
-	isLocked: Boolean,
-	nextEnabled: Boolean,
-	onPrevious: () -> Unit,
-	onNext: () -> Unit,
-	onTogglePlayPause: () -> Unit,
-	onToggleLock: () -> Unit,
-	onCycleResize: () -> Unit
-) {
-	Row(
-		modifier = Modifier
-			.fillMaxWidth()
-			.padding(vertical = 4.dp),
-		horizontalArrangement = Arrangement.SpaceBetween,
-		verticalAlignment = Alignment.CenterVertically
-	) {
-		RippleIconButton(onClick = onToggleLock, size = 40.dp) {
-			Icon(
-				if (isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
-				"Bloquear",
-				tint = Color.White,
-				modifier = Modifier.size(20.dp)
-			)
-		}
-
-		Row(
-			verticalAlignment = Alignment.CenterVertically,
-			horizontalArrangement = Arrangement.spacedBy(18.dp)
+	Box(modifier = Modifier.fillMaxSize()) {
+		AnimatedVisibility(
+			visible = true,
+			enter = fadeIn(tween(220)) + slideInVertically(tween(220)) { -it / 2 },
+			exit = fadeOut(tween(220)) + slideOutVertically(tween(220)) { -it / 2 },
+			modifier = Modifier.align(Alignment.TopCenter)
 		) {
-			RippleIconButton(onClick = onPrevious, size = 40.dp) {
-				Icon(Icons.Default.SkipPrevious, "Anterior", tint = Color.White, modifier = Modifier.size(26.dp))
+			PlayerTopBar(
+				fileName = state.video?.displayName.orEmpty(),
+				isMuted = state.volumeFraction <= 0f,
+				onBack = {
+					scope.launch {
+						viewModel.persistProgress()
+						onBack()
+					}
+				},
+				onOpenQueue = onOpenQueue,
+				onCycleOrientation = viewModel::cycleOrientation,
+				onToggleMute = {
+					if (state.volumeFraction > 0f) {
+						viewModel.setVolumeFraction(0f, fromGesture = false)
+					} else {
+						viewModel.setVolumeFraction(0.5f, fromGesture = false)
+					}
+				},
+				onScreenshot = onScreenshot,
+				onCast = onCast
+			)
+		}
+
+		if (!state.isLocked) {
+			AnimatedVisibility(
+				visible = true,
+				enter = fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 2 },
+				exit = fadeOut(tween(220)) + slideOutVertically(tween(220)) { it / 2 },
+				modifier = Modifier.align(Alignment.BottomCenter)
+			) {
+				Column(
+					modifier = Modifier
+						.fillMaxWidth()
+						.background(
+							Brush.verticalGradient(
+								listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f))
+							)
+						)
+						.navigationBarsPadding()
+						.padding(horizontal = 14.dp, vertical = 6.dp)
+				) {
+					PlayerTimelineBar(
+						progressState = viewModel.progressState,
+						onSeekFraction = { fraction ->
+							val duration = viewModel.progressState.value.durationMs
+							if (duration > 0) {
+								viewModel.seekTo((fraction * duration).toLong())
+							}
+						}
+					)
+
+					PlayerTransportRow(
+						isPlaying = state.isPlaying,
+						isLocked = state.isLocked,
+						nextEnabled = nextEnabled,
+						onPrevious = viewModel::playPrevious,
+						onNext = viewModel::playNext,
+						onTogglePlayPause = viewModel::togglePlayPause,
+						onToggleLock = viewModel::toggleLock,
+						onCycleResize = {
+							onResizeModeChange(
+								when (resizeMode) {
+									AspectRatioFrameLayout.RESIZE_MODE_FIT ->
+										AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+									AspectRatioFrameLayout.RESIZE_MODE_ZOOM ->
+										AspectRatioFrameLayout.RESIZE_MODE_FILL
+									else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+								}
+							)
+						}
+					)
+				}
 			}
-			IconButton(
-				onClick = onTogglePlayPause,
+		} else if (state.controlsVisible) {
+			Text(
+				text = "Pantalla bloqueada — toca el candado para desbloquear",
+				color = Color.White.copy(alpha = 0.8f),
+				style = MaterialTheme.typography.labelMedium,
 				modifier = Modifier
-					.size(56.dp)
-					.background(Color.White, CircleShape)
-			) {
-				Icon(
-					if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-					if (isPlaying) "Pausar" else "Reproducir",
-					tint = Color.Black,
-					modifier = Modifier.size(30.dp)
-				)
-			}
+					.align(Alignment.BottomCenter)
+					.navigationBarsPadding()
+					.padding(16.dp)
+			)
 			IconButton(
-				onClick = onNext,
-				enabled = nextEnabled,
-				modifier = Modifier.size(40.dp)
+				onClick = viewModel::toggleLock,
+				modifier = Modifier
+					.align(Alignment.CenterEnd)
+					.padding(24.dp)
+					.size(48.dp)
+					.background(Color.Black.copy(alpha = 0.45f), androidx.compose.foundation.shape.CircleShape)
 			) {
-				Icon(
-					Icons.Default.SkipNext,
-					"Siguiente",
-					tint = if (nextEnabled) Color.White else Color.White.copy(0.35f),
-					modifier = Modifier.size(26.dp)
-				)
+				Icon(Icons.Default.Lock, "Desbloquear", tint = Color.White)
 			}
 		}
-
-		RippleIconButton(onClick = onCycleResize, size = 40.dp) {
-			Icon(Icons.Default.AspectRatio, "Tamaño de pantalla", tint = Color.White, modifier = Modifier.size(20.dp))
-		}
 	}
-}
-
-@Composable
-private fun RippleIconButton(
-	onClick: () -> Unit,
-	size: androidx.compose.ui.unit.Dp = 36.dp,
-	content: @Composable () -> Unit
-) {
-	IconButton(
-		onClick = onClick,
-		interactionSource = remember { MutableInteractionSource() },
-		modifier = Modifier
-			.size(size)
-			.clip(CircleShape)
-	) {
-		content()
-	}
-}
-
-private fun enterPip(activity: Activity, width: Int, height: Int) {
-	if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-	val w = width.coerceAtLeast(1)
-	val h = height.coerceAtLeast(1)
-	val params = PictureInPictureParams.Builder()
-		.setAspectRatio(Rational(w, h))
-		.build()
-	activity.enterPictureInPictureMode(params)
-}
-
-/**
- * Captures the current video frame from [playerView]'s surface using PixelCopy.
- * Requires API 24+. Hook the resulting Bitmap up to your own save/share flow.
- */
-private fun captureFrame(
-	activity: Activity,
-	playerView: PlayerView?,
-	onResult: (Bitmap?) -> Unit
-) {
-	val surfaceView = playerView?.videoSurfaceView as? android.view.SurfaceView ?: run {
-		onResult(null)
-		return
-	}
-	if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
-		onResult(null)
-		return
-	}
-	val bitmap = Bitmap.createBitmap(
-		surfaceView.width.coerceAtLeast(1),
-		surfaceView.height.coerceAtLeast(1),
-		Bitmap.Config.ARGB_8888
-	)
-	PixelCopy.request(
-		surfaceView,
-		bitmap,
-		{ copyResult ->
-			if (copyResult == PixelCopy.SUCCESS) onResult(bitmap) else onResult(null)
-		},
-		Handler(Looper.getMainLooper())
-	)
 }

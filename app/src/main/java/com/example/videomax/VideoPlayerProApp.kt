@@ -26,7 +26,7 @@ class VideoPlayerProApp : Application(), ImageLoaderFactory {
 			.diskCache {
 				DiskCache.Builder()
 					.directory(cacheDir.resolve("video_thumbs"))
-					.maxSizeBytes(200L * 1024 * 1024)
+					.maxSizeBytes(100L * 1024 * 1024)
 					.build()
 			}
 			.crossfade(false)
