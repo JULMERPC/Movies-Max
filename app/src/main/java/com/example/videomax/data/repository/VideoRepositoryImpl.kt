@@ -258,6 +258,7 @@ class VideoRepositoryImpl @Inject constructor(
 		onProgress: (suspend (indexed: Int, totalHint: Int) -> Unit)?
 	): Int = withContext(Dispatchers.IO) {
 		val settings = settingsRepository.settings.first()
+		val isFirstScan = settings.lastScanTimestamp == 0L
 		var indexed = 0
 		var totalHint = 0
 		var receivedAny = false
@@ -284,10 +285,11 @@ class VideoRepositoryImpl @Inject constructor(
 					fresh.copy(
 						isFavorite = state.isFavorite,
 						lastPositionMs = state.lastPositionMs,
-						playCount = state.playCount
+						playCount = state.playCount,
+						isNew = state.isNew
 					)
 				} else {
-					fresh
+					fresh.copy(isNew = !isFirstScan)
 				}
 			}
 
@@ -306,6 +308,7 @@ class VideoRepositoryImpl @Inject constructor(
 		if (!receivedAny || !keptAny) {
 			videoDao.clearAll()
 			videoDao.clearScanKeepIds()
+			settingsRepository.setLastScanTimestamp(System.currentTimeMillis())
 			onProgress?.invoke(0, 0)
 			return@withContext 0
 		}
@@ -313,6 +316,7 @@ class VideoRepositoryImpl @Inject constructor(
 		// Single SQL set-difference: drop Room rows absent from this scan's keep-set.
 		videoDao.deleteVideosNotInScanKeepSet()
 		videoDao.clearScanKeepIds()
+		settingsRepository.setLastScanTimestamp(System.currentTimeMillis())
 		yield()
 
 		onProgress?.invoke(indexed, indexed)
@@ -329,6 +333,10 @@ class VideoRepositoryImpl @Inject constructor(
 
 	override suspend fun incrementPlayCount(videoId: Long) {
 		videoDao.incrementPlayCount(videoId)
+	}
+
+	override suspend fun markVideoSeen(videoId: Long) {
+		videoDao.updateIsNew(videoId, isNew = false)
 	}
 
 	/** Path-based only — avoids per-file filesystem I/O during scan. */

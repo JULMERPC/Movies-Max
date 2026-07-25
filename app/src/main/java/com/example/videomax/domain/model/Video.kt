@@ -19,7 +19,8 @@ data class Video(
 	val isFavorite: Boolean = false,
 	val lastPositionMs: Long = 0L,
 	val codec: String? = null,
-	val playCount: Int = 0
+	val playCount: Int = 0,
+	val isNew: Boolean = false
 ) {
 	val resolutionLabel: String
 		get() = if (width > 0 && height > 0) "${width}x${height}" else "—"

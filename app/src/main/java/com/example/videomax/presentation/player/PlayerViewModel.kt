@@ -78,6 +78,7 @@ class PlayerViewModel @Inject constructor(
 	private val toggleFavoriteUseCase: ToggleFavoriteUseCase,
 	private val playbackQueue: PlaybackQueue,
 	private val videoRepository: VideoRepository,
+	private val settingsRepository: com.example.videomax.domain.repository.SettingsRepository,
 	observeSettings: ObserveSettingsUseCase,
 	val player: ExoPlayer
 ) : AndroidViewModel(application) {
@@ -132,9 +133,10 @@ class PlayerViewModel @Inject constructor(
 							player.seekTo(0L)
 							player.play()
 						}
-						QueueRepeatMode.ALL -> {
-							if (settings.autoPlayNext) playNextInternal()
-						}
+					QueueRepeatMode.ALL -> {
+						if (settings.autoPlayNext) playNextInternal()
+						else _uiState.update { it.copy(isPlaying = false, controlsVisible = true) }
+					}
 						QueueRepeatMode.OFF -> {
 							if (settings.autoPlayNext && (player.hasNextMediaItem() || playbackQueue.hasNext())) {
 								playNextInternal()
@@ -162,6 +164,7 @@ class PlayerViewModel @Inject constructor(
 				playCountRecordedFor = videoId
 				viewModelScope.launch {
 					runCatching { videoRepository.incrementPlayCount(videoId) }
+					runCatching { videoRepository.markVideoSeen(videoId) }
 				}
 			}
 
@@ -274,6 +277,10 @@ class PlayerViewModel @Inject constructor(
 				player.playWhenReady = true
 			} finally {
 				isSwitchingMedia = false
+			}
+
+			viewModelScope.launch {
+				runCatching { videoRepository.markVideoSeen(startVideoId) }
 			}
 
 			_uiState.update {
@@ -647,16 +654,15 @@ class PlayerViewModel @Inject constructor(
 		player.repeatMode = when {
 			mode == QueueRepeatMode.ONE -> Player.REPEAT_MODE_ONE
 			playbackQueue.isLazy() -> Player.REPEAT_MODE_OFF
-			mode == QueueRepeatMode.ALL -> Player.REPEAT_MODE_ALL
+			mode == QueueRepeatMode.ALL && settings.autoPlayNext -> Player.REPEAT_MODE_ALL
 			else -> Player.REPEAT_MODE_OFF
 		}
 	}
 
-	fun cycleOrientation() {
+	fun cycleOrientation(isDeviceLandscape: Boolean) {
 		val next = when (_uiState.value.orientation) {
-			PlayerOrientation.AUTO -> PlayerOrientation.LANDSCAPE
-			PlayerOrientation.LANDSCAPE -> PlayerOrientation.PORTRAIT
-			PlayerOrientation.PORTRAIT -> PlayerOrientation.AUTO
+			PlayerOrientation.AUTO -> if (isDeviceLandscape) PlayerOrientation.LANDSCAPE else PlayerOrientation.PORTRAIT
+			else -> PlayerOrientation.AUTO
 		}
 		_uiState.update { it.copy(orientation = next) }
 		showControls()
@@ -819,6 +825,14 @@ class PlayerViewModel @Inject constructor(
 		}
 	}
 
+	fun toggleAutoPip() {
+		val next = !_uiState.value.autoPip
+		viewModelScope.launch {
+			settingsRepository.setAutoPip(next)
+		}
+		_uiState.update { it.copy(autoPip = next) }
+	}
+
 	fun seekStepMs(): Long = settings.seekStepSeconds * 1000L
 
 	/**
@@ -906,6 +920,84 @@ class PlayerViewModel @Inject constructor(
 	fun getCurrentQueueIndex(): Int = playbackQueue.currentIndex()
 
 	fun getCurrentVideoId(): Long? = playbackQueue.currentId()
+
+	suspend fun getQueueVideos(): List<Video> {
+		val ids = playbackQueue.ids()
+		if (ids.isEmpty()) return emptyList()
+		return videoRepository.getVideosByIds(ids)
+	}
+
+	fun playQueueItem(index: Int) {
+		val ids = playbackQueue.ids()
+		if (index !in ids.indices) return
+		val videoId = ids[index]
+		viewModelScope.launch {
+			val video = videoRepository.getVideoById(videoId) ?: return@launch
+			persistProgress()
+
+			val isNearby = kotlin.math.abs(index - playbackQueue.currentIndex()) <= 1
+			if (isNearby && index == playbackQueue.currentIndex()) {
+				player.seekTo(0L)
+				player.play()
+				showControls()
+				return@launch
+			}
+
+			if (player.currentMediaItemIndex in 0 until player.mediaItemCount &&
+				player.currentMediaItemIndex != index
+			) {
+				player.seekToDefaultPosition(index)
+				player.play()
+				showControls()
+				return@launch
+			}
+
+			val allIds = playbackQueue.ids()
+			val mediaItems = buildMediaItems(allIds)
+			if (mediaItems.isEmpty()) return@launch
+			val startIdx = index.coerceIn(0, mediaItems.lastIndex)
+			val playWhenReady = player.playWhenReady
+
+			isSwitchingMedia = true
+			try {
+				player.setMediaItems(mediaItems, startIdx, 0L)
+				player.prepare()
+				player.playbackParameters = PlaybackParameters(_uiState.value.playbackSpeed)
+				applyPlayerRepeatMode(_uiState.value.repeatMode)
+				player.playWhenReady = playWhenReady
+			} finally {
+				isSwitchingMedia = false
+			}
+			publishQueueState()
+			showControls()
+		}
+	}
+
+	suspend fun shuffleQueue() {
+		val ids = playbackQueue.ids().toMutableList()
+		if (ids.size < 2) return
+		val currentVideoId = playbackQueue.currentId() ?: return
+		val rest = ids.filter { it != currentVideoId }.shuffled()
+		val shuffled = mutableListOf(currentVideoId)
+		shuffled.addAll(rest)
+		val mediaItems = buildMediaItems(shuffled)
+		if (mediaItems.isEmpty()) return
+		val playWhenReady = player.playWhenReady
+		val currentPos = player.currentPosition
+
+		isSwitchingMedia = true
+		try {
+			player.setMediaItems(mediaItems, 0, currentPos)
+			player.prepare()
+			player.playbackParameters = PlaybackParameters(_uiState.value.playbackSpeed)
+			applyPlayerRepeatMode(_uiState.value.repeatMode)
+			player.playWhenReady = playWhenReady
+		} finally {
+			isSwitchingMedia = false
+		}
+		playbackQueue.setQueue(shuffled, currentVideoId)
+		publishQueueState()
+	}
 
 	private companion object {
 		const val PROGRESS_POLL_MS = 500L

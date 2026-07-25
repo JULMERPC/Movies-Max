@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.videomax.domain.model.AppSettings
@@ -37,6 +38,7 @@ class SettingsDataStore @Inject constructor(
 		val gesturesEnabled = booleanPreferencesKey("gestures_enabled")
 		val autoPip = booleanPreferencesKey("auto_pip")
 		val blacklist = stringPreferencesKey("blacklist")
+		val lastScanTimestamp = longPreferencesKey("last_scan_timestamp")
 	}
 
 	val settings: Flow<AppSettings> = context.settingsDataStore.data.map { prefs ->
@@ -54,7 +56,8 @@ class SettingsDataStore @Inject constructor(
 			showHiddenFiles = prefs[Keys.showHiddenFiles] ?: false,
 			gesturesEnabled = prefs[Keys.gesturesEnabled] ?: true,
 			autoPip = prefs[Keys.autoPip] ?: false,
-			blacklist = decodeBlacklist(prefs[Keys.blacklist])
+			blacklist = decodeBlacklist(prefs[Keys.blacklist]),
+			lastScanTimestamp = prefs[Keys.lastScanTimestamp] ?: 0L
 		)
 	}
 
@@ -97,6 +100,12 @@ class SettingsDataStore @Inject constructor(
 	suspend fun setBlacklist(entries: List<String>) {
 		context.settingsDataStore.edit {
 			it[Keys.blacklist] = encodeBlacklist(entries)
+		}
+	}
+
+	suspend fun setLastScanTimestamp(timestamp: Long) {
+		context.settingsDataStore.edit {
+			it[Keys.lastScanTimestamp] = timestamp
 		}
 	}
 

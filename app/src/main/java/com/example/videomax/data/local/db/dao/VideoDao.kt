@@ -15,7 +15,8 @@ data class VideoUserState(
 	val id: Long,
 	val isFavorite: Boolean,
 	val lastPositionMs: Long,
-	val playCount: Int
+	val playCount: Int,
+	val isNew: Boolean
 )
 
 @Dao
@@ -30,10 +31,10 @@ interface VideoDao {
 	@Query("SELECT * FROM videos WHERE id = :id LIMIT 1")
 	suspend fun getById(id: Long): VideoEntity?
 
-	@Query("SELECT id, isFavorite, lastPositionMs, playCount FROM videos")
+	@Query("SELECT id, isFavorite, lastPositionMs, playCount, isNew FROM videos")
 	suspend fun getUserStates(): List<VideoUserState>
 
-	@Query("SELECT id, isFavorite, lastPositionMs, playCount FROM videos WHERE id IN (:ids)")
+	@Query("SELECT id, isFavorite, lastPositionMs, playCount, isNew FROM videos WHERE id IN (:ids)")
 	suspend fun getUserStatesForIds(ids: List<Long>): List<VideoUserState>
 
 	@Query("SELECT * FROM videos WHERE id IN (:ids)")
@@ -327,6 +328,9 @@ interface VideoDao {
 
 	@Query("UPDATE videos SET playCount = playCount + 1 WHERE id = :videoId")
 	suspend fun incrementPlayCount(videoId: Long)
+
+	@Query("UPDATE videos SET isNew = :isNew WHERE id = :videoId")
+	suspend fun updateIsNew(videoId: Long, isNew: Boolean)
 
 	@Query("SELECT COUNT(*) FROM videos")
 	fun observeCount(): Flow<Int>

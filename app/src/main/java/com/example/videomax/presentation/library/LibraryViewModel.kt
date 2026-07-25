@@ -190,6 +190,10 @@ class LibraryViewModel @Inject constructor(
 		viewModelScope.launch { toggleFavorite(videoId) }
 	}
 
+	fun markVideoSeen(videoId: Long) {
+		viewModelScope.launch { videoRepository.markVideoSeen(videoId) }
+	}
+
 	fun createPlaylist(name: String, videoId: Long? = null) {
 		viewModelScope.launch {
 			val id = playlistRepository.createPlaylist(name)

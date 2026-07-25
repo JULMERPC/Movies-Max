@@ -38,6 +38,7 @@ object DatabaseModule {
 			"video_player_pro.db"
 		)
 			.addMigrations(VideoDatabase.MIGRATION_5_6)
+			.addMigrations(VideoDatabase.MIGRATION_6_7)
 			.fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
 			.build()
 

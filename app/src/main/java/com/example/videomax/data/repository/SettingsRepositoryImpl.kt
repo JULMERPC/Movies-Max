@@ -41,4 +41,6 @@ class SettingsRepositoryImpl @Inject constructor(
 	override suspend fun addBlacklistEntry(entry: String) = dataStore.addBlacklistEntry(entry)
 
 	override suspend fun removeBlacklistEntry(entry: String) = dataStore.removeBlacklistEntry(entry)
+
+	override suspend fun setLastScanTimestamp(timestamp: Long) = dataStore.setLastScanTimestamp(timestamp)
 }

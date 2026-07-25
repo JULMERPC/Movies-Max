@@ -18,6 +18,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -32,12 +33,16 @@ import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Camera
-import androidx.compose.material.icons.filled.Cast
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.PictureInPicture
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.ScreenRotation
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Icon
@@ -154,13 +159,8 @@ internal fun PlayerGestureHint(
 @Composable
 internal fun PlayerTopBar(
 	fileName: String,
-	isMuted: Boolean,
 	onBack: () -> Unit,
-	onOpenQueue: () -> Unit,
-	onCycleOrientation: () -> Unit,
-	onToggleMute: () -> Unit,
-	onScreenshot: () -> Unit,
-	onCast: () -> Unit
+	onOpenQueue: () -> Unit
 ) {
 	Row(
 		verticalAlignment = Alignment.CenterVertically,
@@ -172,7 +172,7 @@ internal fun PlayerTopBar(
 				)
 			)
 			.statusBarsPadding()
-			.padding(horizontal = 4.dp, vertical = 2.dp)
+			.padding(horizontal = 4.dp, vertical = 8.dp)
 	) {
 		RippleIconButton(onClick = onBack) {
 			Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver", tint = Color.White, modifier = Modifier.size(22.dp))
@@ -189,8 +189,39 @@ internal fun PlayerTopBar(
 				.weight(1f)
 				.padding(horizontal = 6.dp)
 		)
+	}
+}
+
+@Composable
+internal fun PlayerSideActions(
+	isMuted: Boolean,
+	isFavorite: Boolean,
+	isOrientationLocked: Boolean,
+	onCycleOrientation: () -> Unit,
+	onToggleMute: () -> Unit,
+	onScreenshot: () -> Unit,
+	onToggleFavorite: () -> Unit,
+	modifier: Modifier = Modifier
+) {
+	Column(
+		verticalArrangement = Arrangement.spacedBy(4.dp),
+		horizontalAlignment = Alignment.CenterHorizontally,
+		modifier = modifier
+			.background(
+				Brush.verticalGradient(
+					listOf(Color.Black.copy(alpha = 0.45f), Color.Transparent)
+				),
+				RoundedCornerShape(12.dp)
+			)
+			.padding(vertical = 6.dp, horizontal = 4.dp)
+	) {
 		RippleIconButton(onClick = onCycleOrientation) {
-			Icon(Icons.Default.ScreenRotation, "Rotar", tint = Color.White, modifier = Modifier.size(20.dp))
+			Icon(
+				Icons.Default.ScreenRotation,
+				if (isOrientationLocked) "Bloquear orientación" else "Permitir rotación",
+				tint = if (isOrientationLocked) MaterialTheme.colorScheme.secondary else Color.White,
+				modifier = Modifier.size(20.dp)
+			)
 		}
 		RippleIconButton(onClick = onToggleMute) {
 			Icon(
@@ -203,8 +234,13 @@ internal fun PlayerTopBar(
 		RippleIconButton(onClick = onScreenshot) {
 			Icon(Icons.Default.Camera, "Captura", tint = Color.White, modifier = Modifier.size(20.dp))
 		}
-		RippleIconButton(onClick = onCast) {
-			Icon(Icons.Default.Cast, "Cast", tint = Color.White, modifier = Modifier.size(20.dp))
+		RippleIconButton(onClick = onToggleFavorite) {
+			Icon(
+				if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+				"Favorito",
+				tint = if (isFavorite) MaterialTheme.colorScheme.secondary else Color.White,
+				modifier = Modifier.size(20.dp)
+			)
 		}
 	}
 }
@@ -335,5 +371,55 @@ internal fun RippleIconButton(
 			.clip(CircleShape)
 	) {
 		content()
+	}
+}
+
+@Composable
+internal fun PlayerOptionsRow(
+	isAutoPip: Boolean,
+	playbackSpeed: Float,
+	onToggleAutoPip: () -> Unit,
+	onCycleSpeed: () -> Unit,
+	onOpenSettings: () -> Unit
+) {
+	Row(
+		modifier = Modifier
+			.fillMaxWidth()
+			.padding(horizontal = 14.dp, vertical = 2.dp),
+		horizontalArrangement = Arrangement.SpaceBetween,
+		verticalAlignment = Alignment.CenterVertically
+	) {
+		RippleIconButton(onClick = onToggleAutoPip) {
+			Icon(
+				Icons.Default.PictureInPicture,
+				contentDescription = "PiP",
+				tint = if (isAutoPip) MaterialTheme.colorScheme.primary else Color.White,
+				modifier = Modifier.size(20.dp)
+			)
+		}
+
+		RippleIconButton(onClick = onCycleSpeed) {
+			Icon(
+				Icons.Default.Speed,
+				contentDescription = "Velocidad",
+				tint = Color.White,
+				modifier = Modifier.size(20.dp)
+			)
+		}
+
+		Text(
+			text = if (playbackSpeed == 1f) "1x" else "${playbackSpeed}x",
+			color = if (playbackSpeed == 1f) Color.White.copy(alpha = 0.6f) else MaterialTheme.colorScheme.primary,
+			style = MaterialTheme.typography.labelSmall
+		)
+
+		RippleIconButton(onClick = onOpenSettings) {
+			Icon(
+				Icons.Default.Settings,
+				contentDescription = "Ajustes del video",
+				tint = Color.White,
+				modifier = Modifier.size(20.dp)
+			)
+		}
 	}
 }

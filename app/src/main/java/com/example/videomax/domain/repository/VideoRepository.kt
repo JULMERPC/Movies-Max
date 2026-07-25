@@ -74,4 +74,5 @@ interface VideoRepository {
 	suspend fun updateFavorite(videoId: Long, isFavorite: Boolean)
 	suspend fun updateLastPosition(videoId: Long, positionMs: Long)
 	suspend fun incrementPlayCount(videoId: Long)
+	suspend fun markVideoSeen(videoId: Long)
 }

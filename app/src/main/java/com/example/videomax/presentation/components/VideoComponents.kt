@@ -72,6 +72,13 @@ fun VideoGridItem(
 				lightweight = true,
 				modifier = Modifier.fillMaxSize()
 			)
+			if (video.isNew) {
+				NewBadge(
+					modifier = Modifier
+						.align(Alignment.TopStart)
+						.padding(6.dp)
+				)
+			}
 			Text(
 				text = Formatters.formatDuration(video.durationMs),
 				style = MaterialTheme.typography.labelSmall,
@@ -125,6 +132,13 @@ fun VideoGridItem(
 						)
 					)
 			)
+			if (video.isNew) {
+				NewBadge(
+					modifier = Modifier
+						.align(Alignment.TopStart)
+						.padding(10.dp)
+				)
+			}
 			Text(
 				text = Formatters.formatDuration(video.durationMs),
 				style = MaterialTheme.typography.labelMedium,
@@ -222,12 +236,19 @@ fun VideoListItem(
 		}
 		Spacer(modifier = Modifier.width(12.dp))
 		Column(modifier = Modifier.weight(1f)) {
-			Text(
-				text = video.displayName,
-				style = MaterialTheme.typography.titleMedium,
-				maxLines = 2,
-				overflow = TextOverflow.Ellipsis
-			)
+			Row(verticalAlignment = Alignment.CenterVertically) {
+				Text(
+					text = video.displayName,
+					style = MaterialTheme.typography.titleMedium,
+					maxLines = 2,
+					overflow = TextOverflow.Ellipsis,
+					modifier = Modifier.weight(1f, fill = false)
+				)
+				if (video.isNew) {
+					Spacer(modifier = Modifier.width(6.dp))
+					NewBadge()
+				}
+			}
 			Text(
 				text = "${Formatters.formatDuration(video.durationMs)} · ${video.resolutionLabel}",
 				style = MaterialTheme.typography.bodyMedium,
@@ -277,6 +298,21 @@ fun VideoThumbnail(
 		contentDescription = null,
 		contentScale = ContentScale.Crop,
 		modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant)
+	)
+}
+
+@Composable
+fun NewBadge(modifier: Modifier = Modifier) {
+	Text(
+		text = "NEW",
+		style = MaterialTheme.typography.labelSmall,
+		color = Color.White,
+		modifier = modifier
+			.background(
+				color = MaterialTheme.colorScheme.primary,
+				shape = RoundedCornerShape(4.dp)
+			)
+			.padding(horizontal = 6.dp, vertical = 2.dp)
 	)
 }
 

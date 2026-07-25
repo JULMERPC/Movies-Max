@@ -34,7 +34,8 @@ data class AppSettings(
 	val showHiddenFiles: Boolean = false,
 	val gesturesEnabled: Boolean = true,
 	val autoPip: Boolean = false,
-	val blacklist: List<String> = emptyList()
+	val blacklist: List<String> = emptyList(),
+	val lastScanTimestamp: Long = 0L
 )
 
 data class SubtitleTrack(

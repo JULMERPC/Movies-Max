@@ -32,5 +32,6 @@ data class VideoEntity(
 	val isFavorite: Boolean = false,
 	val lastPositionMs: Long = 0L,
 	val codec: String? = null,
-	val playCount: Int = 0
+	val playCount: Int = 0,
+	val isNew: Boolean = false
 )

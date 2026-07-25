@@ -1,5 +1,9 @@
 package com.example.videomax.presentation.navigation
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
@@ -106,7 +110,31 @@ fun VideoPlayerNavHost() {
 			}
 			composable(
 				route = Screen.Player.route,
-				arguments = listOf(navArgument("videoId") { type = NavType.LongType })
+				arguments = listOf(navArgument("videoId") { type = NavType.LongType }),
+				enterTransition = {
+					slideInHorizontally(
+						initialOffsetX = { fullWidth -> fullWidth },
+						animationSpec = androidx.compose.animation.core.tween(300)
+					)
+				},
+				exitTransition = {
+					slideOutHorizontally(
+						targetOffsetX = { fullWidth -> fullWidth },
+						animationSpec = androidx.compose.animation.core.tween(300)
+					)
+				},
+				popEnterTransition = {
+					slideInHorizontally(
+						initialOffsetX = { fullWidth -> -fullWidth },
+						animationSpec = androidx.compose.animation.core.tween(300)
+					)
+				},
+				popExitTransition = {
+					slideOutHorizontally(
+						targetOffsetX = { fullWidth -> fullWidth },
+						animationSpec = androidx.compose.animation.core.tween(300)
+					)
+				}
 			) {
 				PlayerScreen(
 					onBack = { navController.popBackStack() },

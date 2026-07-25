@@ -33,7 +33,6 @@ import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.VideoFile
 import androidx.compose.material3.DropdownMenu
@@ -68,6 +67,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
@@ -89,6 +90,10 @@ fun LibraryScreen(
 	val pagingItems = viewModel.videos.collectAsLazyPagingItems()
 	val snackbarHostState = remember { SnackbarHostState() }
 	val scope = rememberCoroutineScope()
+
+	LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+		viewModel.refresh()
+	}
 
 	LaunchedEffect(state.message) {
 		state.message?.let {
@@ -113,7 +118,6 @@ fun LibraryScreen(
 				isGridProvider = { state.isGrid },
 				isSearchOpenProvider = { state.isSearchOpen },
 				queryProvider = { state.query },
-				onRefresh = viewModel::refresh,
 				onToggleLayout = viewModel::toggleLayout,
 				onSortSelected = viewModel::onSortSelected,
 				onToggleSearch = viewModel::toggleSearch,
@@ -149,6 +153,7 @@ fun LibraryScreen(
 							isScanningProvider = { state.isScanning },
 							onVideoClick = { videoId ->
 								scope.launch {
+									viewModel.markVideoSeen(videoId)
 									viewModel.preparePlayback(videoId)
 									onOpenPlayer(videoId)
 								}
@@ -187,7 +192,6 @@ fun LibraryTopBar(
 	isGridProvider: () -> Boolean,
 	isSearchOpenProvider: () -> Boolean,
 	queryProvider: () -> String,
-	onRefresh: () -> Unit,
 	onToggleLayout: () -> Unit,
 	onSortSelected: (SortOption) -> Unit,
 	onToggleSearch: () -> Unit,
@@ -211,11 +215,8 @@ fun LibraryTopBar(
 					)
 				}
 			},
-			actions = {
-				IconButton(onClick = onRefresh) {
-					Icon(Icons.Default.Refresh, contentDescription = "Scan")
-				}
-				IconButton(onClick = onToggleLayout) {
+		actions = {
+			IconButton(onClick = onToggleLayout) {
 					Icon(
 						if (isGrid) Icons.AutoMirrored.Filled.ViewList else Icons.Default.GridView,
 						contentDescription = "Toggle layout"

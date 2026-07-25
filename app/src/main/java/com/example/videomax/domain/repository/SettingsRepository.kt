@@ -19,4 +19,5 @@ interface SettingsRepository {
 	suspend fun setBlacklist(entries: List<String>)
 	suspend fun addBlacklistEntry(entry: String)
 	suspend fun removeBlacklistEntry(entry: String)
+	suspend fun setLastScanTimestamp(timestamp: Long)
 }
