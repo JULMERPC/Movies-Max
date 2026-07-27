@@ -14,7 +14,8 @@ enum class SortOption {
 enum class ThemeMode {
 	SYSTEM,
 	LIGHT,
-	DARK
+	DARK,
+	AMOLED
 }
 
 data class AppSettings(

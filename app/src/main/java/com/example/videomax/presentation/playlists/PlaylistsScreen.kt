@@ -37,6 +37,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -52,6 +53,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -61,6 +63,8 @@ import com.example.videomax.presentation.components.EmptyState
 import com.example.videomax.presentation.components.VideoGridItem
 import com.example.videomax.presentation.components.VideoThumbnail
 import com.example.videomax.presentation.navigation.Screen
+import com.example.videomax.presentation.theme.VideoMaxDimens
+import com.example.videomax.presentation.theme.VideoMaxTheme
 import com.example.videomax.presentation.theme.screenGradient
 import com.example.videomax.util.Formatters
 
@@ -92,10 +96,14 @@ fun PlaylistsScreen(
 		containerColor = Color.Transparent,
 		topBar = {
 			TopAppBar(
-				title = { Text("Playlists") },
+				title = { Text("Playlists", color = VideoMaxTheme.extended.textPrimary) },
 				colors = TopAppBarDefaults.topAppBarColors(
-					containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.35f),
-					titleContentColor = MaterialTheme.colorScheme.onSurface
+					containerColor = Color(
+						MaterialTheme.colorScheme.primary.red,
+						MaterialTheme.colorScheme.primary.green,
+						MaterialTheme.colorScheme.primary.blue,
+						0.10f
+					).compositeOver(Color.White)
 				)
 			)
 		},
@@ -113,8 +121,8 @@ fun PlaylistsScreen(
 		) {
 			LazyColumn(
 				modifier = Modifier.fillMaxSize(),
-				contentPadding = PaddingValues(16.dp),
-				verticalArrangement = Arrangement.spacedBy(12.dp)
+				contentPadding = PaddingValues(VideoMaxDimens.spacingLg),
+				verticalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingMd)
 			) {
 				item {
 					Text(
@@ -127,7 +135,7 @@ fun PlaylistsScreen(
 					SmartCategoryCard(category = category, onClick = { onOpenSmart(category.type) })
 				}
 				item {
-					Spacer(modifier = Modifier.height(8.dp))
+					Spacer(modifier = Modifier.height(VideoMaxDimens.spacingSm))
 					Text(
 						text = "Tus listas",
 						style = MaterialTheme.typography.titleMedium,
@@ -137,27 +145,38 @@ fun PlaylistsScreen(
 				if (playlists.isEmpty()) {
 					item {
 						Text(
-							text = "Create a playlist to organize your videos.",
+							text = "Creá una lista para organizar tus videos.",
 							style = MaterialTheme.typography.bodyMedium,
-							color = MaterialTheme.colorScheme.onSurfaceVariant
+							color = VideoMaxTheme.extended.textTertiary
 						)
 					}
 				} else {
 					items(playlists, key = { it.id }) { playlist ->
 						ListItem(
-							headlineContent = { Text(playlist.name) },
-							supportingContent = { Text("${playlist.videoCount} videos") },
+							headlineContent = { Text(playlist.name, color = VideoMaxTheme.extended.textPrimary) },
+							supportingContent = { Text("${playlist.videoCount} videos", color = VideoMaxTheme.extended.textTertiary) },
 							leadingContent = {
-								Icon(Icons.AutoMirrored.Filled.PlaylistPlay, contentDescription = null)
+								Icon(
+									Icons.AutoMirrored.Filled.PlaylistPlay,
+									contentDescription = null,
+									tint = MaterialTheme.colorScheme.primary,
+									modifier = Modifier.size(VideoMaxDimens.iconSizeMd)
+								)
 							},
 							trailingContent = {
 								IconButton(onClick = { viewModel.delete(playlist.id) }) {
-									Icon(Icons.Default.Delete, contentDescription = "Delete")
+									Icon(
+										Icons.Default.Delete,
+										contentDescription = "Eliminar",
+										tint = VideoMaxTheme.extended.textTertiary,
+										modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
+									)
 								}
 							},
 							modifier = Modifier
 								.fillMaxWidth()
-								.clickable { onOpenPlaylist(playlist.id) }
+								.clickable { onOpenPlaylist(playlist.id) },
+							colors = ListItemDefaults.colors(containerColor = Color.Transparent)
 						)
 					}
 				}
@@ -188,12 +207,11 @@ fun PlaylistsScreen(
 						}
 					}
 				) { Text("Crear") }
-
-				
 			},
 			dismissButton = {
 				TextButton(onClick = { showDialog = false }) { Text("Cancelar") }
-			}
+			},
+			containerColor = MaterialTheme.colorScheme.surface
 		)
 	}
 }
@@ -202,31 +220,31 @@ fun PlaylistsScreen(
 private fun SmartCategoryCard(category: SmartCategory, onClick: () -> Unit) {
 	Card(
 		onClick = onClick,
-		shape = RoundedCornerShape(20.dp),
+		shape = RoundedCornerShape(VideoMaxDimens.radiusLg),
 		colors = CardDefaults.cardColors(
-			containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+			containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
 		),
-		elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+		elevation = CardDefaults.cardElevation(defaultElevation = VideoMaxDimens.elevationNone)
 	) {
 		Row(
 			modifier = Modifier
 				.fillMaxWidth()
-				.padding(16.dp),
+				.padding(VideoMaxDimens.spacingLg),
 			verticalAlignment = Alignment.CenterVertically
 		) {
 			Icon(
 				imageVector = category.icon,
 				contentDescription = null,
 				tint = MaterialTheme.colorScheme.primary,
-				modifier = Modifier.size(28.dp)
+				modifier = Modifier.size(VideoMaxDimens.iconSizeLg)
 			)
-			Spacer(modifier = Modifier.width(14.dp))
+			Spacer(modifier = Modifier.width(VideoMaxDimens.spacingLg))
 			Column(modifier = Modifier.weight(1f)) {
-				Text(category.title, style = MaterialTheme.typography.titleMedium)
+				Text(category.title, style = MaterialTheme.typography.titleMedium, color = VideoMaxTheme.extended.textPrimary)
 				Text(
 					category.subtitle,
 					style = MaterialTheme.typography.bodyMedium,
-					color = MaterialTheme.colorScheme.onSurfaceVariant
+					color = VideoMaxTheme.extended.textTertiary
 				)
 			}
 		}
@@ -255,10 +273,10 @@ fun SmartCollectionScreen(
 		containerColor = Color.Transparent,
 		topBar = {
 			TopAppBar(
-				title = { Text(title) },
+				title = { Text(title, color = VideoMaxTheme.extended.textPrimary) },
 				navigationIcon = {
 					IconButton(onClick = onBack) {
-						Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+						Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = VideoMaxTheme.extended.textPrimary)
 					}
 				},
 				actions = {
@@ -266,13 +284,21 @@ fun SmartCollectionScreen(
 						viewModel.type == Screen.SmartCollection.RECENT
 					) {
 						IconButton(onClick = viewModel::clearHistory) {
-							Icon(Icons.Default.Delete, contentDescription = "Clear")
+							Icon(
+								Icons.Default.Delete,
+								contentDescription = "Limpiar",
+								tint = VideoMaxTheme.extended.textTertiary
+							)
 						}
 					}
 				},
 				colors = TopAppBarDefaults.topAppBarColors(
-					containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.35f),
-					titleContentColor = MaterialTheme.colorScheme.onSurface
+					containerColor = Color(
+						MaterialTheme.colorScheme.primary.red,
+						MaterialTheme.colorScheme.primary.green,
+						MaterialTheme.colorScheme.primary.blue,
+						0.10f
+					).compositeOver(Color.White)
 				)
 			)
 		}
@@ -310,8 +336,8 @@ fun SmartCollectionScreen(
 					val history by viewModel.history.collectAsStateWithLifecycle()
 					if (history.isEmpty()) {
 						EmptyState(
-							title = "No history yet",
-							subtitle = "Videos you watch will appear here."
+							title = "Sin historial",
+							subtitle = "Los videos que veas aparecerán acá."
 						)
 					} else {
 						LazyColumn {
@@ -323,7 +349,7 @@ fun SmartCollectionScreen(
 											viewModel.prepareFromHistory(history, item.videoId)
 											onOpenPlayer(item.videoId)
 										}
-										.padding(horizontal = 16.dp, vertical = 10.dp),
+										.padding(horizontal = VideoMaxDimens.spacingLg, vertical = VideoMaxDimens.spacingSm),
 									verticalAlignment = Alignment.CenterVertically
 								) {
 									VideoThumbnail(
@@ -332,13 +358,18 @@ fun SmartCollectionScreen(
 											.width(120.dp)
 											.height(68.dp)
 									)
-									Spacer(modifier = Modifier.width(12.dp))
+									Spacer(modifier = Modifier.width(VideoMaxDimens.spacingMd))
 									Column(modifier = Modifier.weight(1f)) {
-										Text(item.displayName, style = MaterialTheme.typography.titleMedium, maxLines = 2)
+										Text(
+											item.displayName,
+											style = MaterialTheme.typography.titleMedium,
+											color = VideoMaxTheme.extended.textPrimary,
+											maxLines = 2
+										)
 										Text(
 											"${Formatters.formatDuration(item.positionMs)} / ${Formatters.formatDuration(item.durationMs)}",
 											style = MaterialTheme.typography.bodyMedium,
-											color = MaterialTheme.colorScheme.onSurfaceVariant
+											color = VideoMaxTheme.extended.textTertiary
 										)
 									}
 								}
@@ -357,7 +388,7 @@ fun SmartCollectionScreen(
 						onFavorite = viewModel::toggleFavorite
 					)
 				}
-				else -> EmptyState("Desconocido", "Coleccion no soportada")
+				else -> EmptyState("Desconocido", "Colección no soportada")
 			}
 		}
 	}
@@ -372,16 +403,16 @@ private fun VideoCollectionGrid(
 ) {
 	if (videos.isEmpty()) {
 		EmptyState(
-			title = "Nothing here yet",
-			subtitle = "Add favorites or play more videos.",
+			title = "Vacío por acá",
+			subtitle = "Agregá favoritos o reproducí más videos.",
 			modifier = modifier
 		)
 	} else {
 		LazyVerticalGrid(
 			columns = GridCells.Adaptive(168.dp),
-			contentPadding = PaddingValues(16.dp),
-			verticalArrangement = Arrangement.spacedBy(14.dp),
-			horizontalArrangement = Arrangement.spacedBy(14.dp),
+			contentPadding = PaddingValues(VideoMaxDimens.spacingLg),
+			verticalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingLg),
+			horizontalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingMd),
 			modifier = modifier.fillMaxSize()
 		) {
 			items(videos, key = { it.id }) { video ->
@@ -410,15 +441,19 @@ fun PlaylistDetailScreen(
 		containerColor = Color.Transparent,
 		topBar = {
 			TopAppBar(
-				title = { Text(playlist?.playlist?.name ?: "Playlist") },
+				title = { Text(playlist?.playlist?.name ?: "Playlist", color = VideoMaxTheme.extended.textPrimary) },
 				navigationIcon = {
 					IconButton(onClick = onBack) {
-						Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+						Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = VideoMaxTheme.extended.textPrimary)
 					}
 				},
 				colors = TopAppBarDefaults.topAppBarColors(
-					containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.35f),
-					titleContentColor = MaterialTheme.colorScheme.onSurface
+					containerColor = Color(
+						MaterialTheme.colorScheme.primary.red,
+						MaterialTheme.colorScheme.primary.green,
+						MaterialTheme.colorScheme.primary.blue,
+						0.10f
+					).compositeOver(Color.White)
 				)
 			)
 		}
@@ -432,15 +467,15 @@ fun PlaylistDetailScreen(
 			val videos = playlist?.videos.orEmpty()
 			if (videos.isEmpty()) {
 				EmptyState(
-					title = "Lista vacia",
-					subtitle = "Agrega videos desde la biblioteca."
+					title = "Lista vacía",
+					subtitle = "Agregá videos desde la biblioteca."
 				)
 			} else {
 				LazyVerticalGrid(
 					columns = GridCells.Adaptive(168.dp),
-					contentPadding = PaddingValues(16.dp),
-					verticalArrangement = Arrangement.spacedBy(14.dp),
-					horizontalArrangement = Arrangement.spacedBy(14.dp),
+					contentPadding = PaddingValues(VideoMaxDimens.spacingLg),
+					verticalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingLg),
+					horizontalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingMd),
 					modifier = Modifier.fillMaxSize()
 				) {
 					items(videos, key = { it.id }) { video ->

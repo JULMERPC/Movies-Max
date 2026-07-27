@@ -1,6 +1,12 @@
 package com.example.videomax.presentation.components
 
 import android.net.Uri
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -55,11 +61,9 @@ import coil.request.videoFrameMillis
 import coil.size.Precision
 import coil.size.Scale
 import com.example.videomax.domain.model.Video
+import com.example.videomax.presentation.theme.VideoMaxTheme
 import com.example.videomax.util.Formatters
 
-/**
- * Grid cell with large thumbnail plus title / folder / size description.
- */
 @Composable
 fun VideoGridItem(
 	video: Video,
@@ -76,42 +80,36 @@ fun VideoGridItem(
 			modifier = modifier
 				.fillMaxWidth()
 				.aspectRatio(16f / 9f)
-				.clip(RoundedCornerShape(10.dp))
-				.background(MaterialTheme.colorScheme.surfaceVariant)
-				.clickable(onClick = onClick)
-		) {
-			VideoThumbnail(
-				uri = video.uri,
-				cacheKey = "g_${video.id}",
-				lightweight = true,
-				modifier = Modifier.fillMaxSize()
-			)
+			.clip(RoundedCornerShape(14.dp))
+			.background(MaterialTheme.colorScheme.surfaceContainerHigh)
+			.clickable(onClick = onClick)
+	) {
+		VideoThumbnail(
+			uri = video.uri,
+			cacheKey = "g_${video.id}",
+			lightweight = true,
+			modifier = Modifier.fillMaxSize()
+		)
 			if (video.isNew) {
 				NewBadge(
 					modifier = Modifier
 						.align(Alignment.TopStart)
-						.padding(6.dp)
+						.padding(8.dp)
 				)
 			}
-			Text(
-				text = Formatters.formatDuration(video.durationMs),
-				style = MaterialTheme.typography.labelSmall,
-				color = Color.White,
+			DurationBadge(
+				durationMs = video.durationMs,
 				modifier = Modifier
 					.align(Alignment.BottomEnd)
-					.padding(6.dp)
-					.background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(4.dp))
-					.padding(horizontal = 5.dp, vertical = 2.dp)
+					.padding(8.dp)
 			)
 			if (video.lastPositionMs > 0 && video.durationMs > 0) {
-				LinearProgressIndicator(
-					progress = { (video.lastPositionMs.toFloat() / video.durationMs).coerceIn(0f, 1f) },
+				ProgressOverlay(
+					fraction = video.lastPositionMs.toFloat() / video.durationMs,
 					modifier = Modifier
 						.fillMaxWidth()
 						.align(Alignment.BottomCenter)
-						.height(2.dp),
-					color = MaterialTheme.colorScheme.primary,
-					trackColor = Color.Transparent
+						.height(3.dp)
 				)
 			}
 		}
@@ -129,7 +127,7 @@ fun VideoGridItem(
 				.fillMaxWidth()
 				.aspectRatio(16f / 9f)
 				.clip(RoundedCornerShape(14.dp))
-				.background(MaterialTheme.colorScheme.surfaceVariant)
+				.background(MaterialTheme.colorScheme.surfaceContainerHigh)
 		) {
 			VideoThumbnail(
 				uri = video.uri,
@@ -142,7 +140,7 @@ fun VideoGridItem(
 					.fillMaxSize()
 					.background(
 						Brush.verticalGradient(
-							listOf(Color.Transparent, Color.Black.copy(alpha = 0.45f))
+							listOf(Color.Transparent, Color.Black.copy(alpha = 0.5f))
 						)
 					)
 			)
@@ -153,20 +151,16 @@ fun VideoGridItem(
 						.padding(10.dp)
 				)
 			}
-			Text(
-				text = Formatters.formatDuration(video.durationMs),
-				style = MaterialTheme.typography.labelMedium,
-				color = Color.White,
+			DurationBadge(
+				durationMs = video.durationMs,
 				modifier = Modifier
 					.align(Alignment.BottomEnd)
 					.padding(10.dp)
-					.background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
-					.padding(horizontal = 7.dp, vertical = 3.dp)
 			)
 			Row(
 				modifier = Modifier
 					.align(Alignment.TopEnd)
-					.padding(2.dp),
+					.padding(4.dp),
 				horizontalArrangement = Arrangement.End
 			) {
 				IconButton(onClick = onFavoriteClick) {
@@ -193,37 +187,27 @@ fun VideoGridItem(
 				}
 			}
 			if (video.lastPositionMs > 0 && video.durationMs > 0) {
-				LinearProgressIndicator(
-					progress = { (video.lastPositionMs.toFloat() / video.durationMs).coerceIn(0f, 1f) },
+				ProgressOverlay(
+					fraction = video.lastPositionMs.toFloat() / video.durationMs,
 					modifier = Modifier
 						.fillMaxWidth()
 						.align(Alignment.BottomCenter)
-						.height(3.dp),
-					color = MaterialTheme.colorScheme.primary,
-					trackColor = Color.White.copy(alpha = 0.25f)
+						.height(3.dp)
 				)
 			}
 		}
-		Column(modifier = Modifier.padding(top = 10.dp, start = 2.dp, end = 2.dp, bottom = 2.dp)) {
+		Column(modifier = Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp, bottom = 2.dp)) {
 			Text(
 				text = video.displayName,
 				style = MaterialTheme.typography.titleSmall,
-				maxLines = 2,
-				overflow = TextOverflow.Ellipsis
+				maxLines = 1,
+				overflow = TextOverflow.Ellipsis,
+				color = VideoMaxTheme.extended.textPrimary
 			)
-			Spacer(modifier = Modifier.height(4.dp))
 			Text(
 				text = video.folderName,
 				style = MaterialTheme.typography.bodySmall,
-				color = MaterialTheme.colorScheme.onSurfaceVariant,
-				maxLines = 1,
-				overflow = TextOverflow.Ellipsis
-			)
-			Spacer(modifier = Modifier.height(2.dp))
-			Text(
-				text = "${Formatters.formatFileSize(video.sizeBytes)} · ${video.resolutionLabel}",
-				style = MaterialTheme.typography.labelSmall,
-				color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+				color = VideoMaxTheme.extended.textTertiary,
 				maxLines = 1,
 				overflow = TextOverflow.Ellipsis
 			)
@@ -245,15 +229,15 @@ fun VideoListItem(
 		modifier = modifier
 			.fillMaxWidth()
 			.clickable(onClick = onClick)
-			.padding(horizontal = 16.dp, vertical = 10.dp),
+			.padding(horizontal = 12.dp, vertical = 8.dp),
 		verticalAlignment = Alignment.CenterVertically
 	) {
 		Box(
 			modifier = Modifier
 				.width(120.dp)
 				.aspectRatio(16f / 9f)
-				.clip(RoundedCornerShape(8.dp))
-				.background(MaterialTheme.colorScheme.surfaceVariant)
+				.clip(RoundedCornerShape(14.dp))
+				.background(MaterialTheme.colorScheme.surfaceContainerHigh)
 		) {
 			VideoThumbnail(
 				uri = video.uri,
@@ -267,17 +251,33 @@ fun VideoListItem(
 				tint = Color.White.copy(alpha = 0.9f),
 				modifier = Modifier
 					.align(Alignment.Center)
-					.size(28.dp)
+					.size(24.dp)
 			)
+			DurationBadge(
+				durationMs = video.durationMs,
+				modifier = Modifier
+					.align(Alignment.BottomEnd)
+					.padding(4.dp)
+			)
+			if (video.lastPositionMs > 0 && video.durationMs > 0) {
+				ProgressOverlay(
+					fraction = video.lastPositionMs.toFloat() / video.durationMs,
+					modifier = Modifier
+						.fillMaxWidth()
+						.align(Alignment.BottomCenter)
+						.height(2.dp)
+				)
+			}
 		}
 		Spacer(modifier = Modifier.width(12.dp))
 		Column(modifier = Modifier.weight(1f)) {
 			Row(verticalAlignment = Alignment.CenterVertically) {
 				Text(
 					text = video.displayName,
-					style = MaterialTheme.typography.titleMedium,
-					maxLines = 2,
+					style = MaterialTheme.typography.titleSmall,
+					maxLines = 1,
 					overflow = TextOverflow.Ellipsis,
+					color = VideoMaxTheme.extended.textPrimary,
 					modifier = Modifier.weight(1f, fill = false)
 				)
 				if (video.isNew) {
@@ -286,16 +286,18 @@ fun VideoListItem(
 				}
 			}
 			Text(
-				text = "${Formatters.formatDuration(video.durationMs)} · ${video.resolutionLabel}",
-				style = MaterialTheme.typography.bodyMedium,
-				color = MaterialTheme.colorScheme.onSurfaceVariant
+				text = video.folderName,
+				style = MaterialTheme.typography.bodySmall,
+				color = VideoMaxTheme.extended.textTertiary,
+				maxLines = 1,
+				overflow = TextOverflow.Ellipsis
 			)
 		}
 		IconButton(onClick = onFavoriteClick) {
 			Icon(
 				imageVector = if (video.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
 				contentDescription = "Favorite",
-				tint = if (video.isFavorite) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant
+				tint = if (video.isFavorite) MaterialTheme.colorScheme.secondary else VideoMaxTheme.extended.textTertiary
 			)
 		}
 		if (onMenuAction != null) {
@@ -303,7 +305,7 @@ fun VideoListItem(
 				Icon(
 					imageVector = Icons.Default.MoreVert,
 					contentDescription = "Menu",
-					tint = MaterialTheme.colorScheme.onSurfaceVariant
+					tint = VideoMaxTheme.extended.textTertiary
 				)
 			}
 			VideoContextMenu(
@@ -316,9 +318,34 @@ fun VideoListItem(
 	}
 }
 
-/**
- * @param lightweight smaller decode target + first frame — for grids/lists to avoid UI stalls.
- */
+@Composable
+private fun DurationBadge(
+	durationMs: Long,
+	modifier: Modifier = Modifier
+) {
+	Text(
+		text = Formatters.formatDuration(durationMs),
+		style = MaterialTheme.typography.labelSmall,
+		color = Color.White,
+		modifier = modifier
+			.background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(6.dp))
+			.padding(horizontal = 6.dp, vertical = 2.dp)
+	)
+}
+
+@Composable
+private fun ProgressOverlay(
+	fraction: Float,
+	modifier: Modifier = Modifier
+) {
+	LinearProgressIndicator(
+		progress = { fraction.coerceIn(0f, 1f) },
+		modifier = modifier,
+		color = MaterialTheme.colorScheme.primary,
+		trackColor = Color.White.copy(alpha = 0.25f)
+	)
+}
+
 @Composable
 fun VideoThumbnail(
 	uri: String,
@@ -332,9 +359,8 @@ fun VideoThumbnail(
 			.data(Uri.parse(uri))
 			.memoryCacheKey(cacheKey ?: uri)
 			.diskCacheKey(cacheKey ?: uri)
-			// Frame 0 is much cheaper than seeking to 1s on every cell.
 			.videoFrameMillis(0)
-			.crossfade(false)
+			.crossfade(200)
 			.apply {
 				if (lightweight) {
 					size(320, 180)
@@ -348,20 +374,20 @@ fun VideoThumbnail(
 		model = model,
 		contentDescription = null,
 		contentScale = ContentScale.Crop,
-		modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant)
+		modifier = modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh)
 	)
 }
 
 @Composable
 fun NewBadge(modifier: Modifier = Modifier) {
 	Text(
-		text = "NEW",
+		text = "NUEVO",
 		style = MaterialTheme.typography.labelSmall,
 		color = Color.White,
 		modifier = modifier
 			.background(
 				color = MaterialTheme.colorScheme.primary,
-				shape = RoundedCornerShape(4.dp)
+				shape = RoundedCornerShape(6.dp)
 			)
 			.padding(horizontal = 6.dp, vertical = 2.dp)
 	)
@@ -383,16 +409,20 @@ fun EmptyState(
 		Icon(
 			imageVector = Icons.Default.Movie,
 			contentDescription = null,
-			modifier = Modifier.size(64.dp),
-			tint = MaterialTheme.colorScheme.primary
+			modifier = Modifier.size(56.dp),
+			tint = VideoMaxTheme.extended.textTertiary
 		)
 		Spacer(modifier = Modifier.height(16.dp))
-		Text(text = title, style = MaterialTheme.typography.headlineMedium)
-		Spacer(modifier = Modifier.height(8.dp))
+		Text(
+			text = title,
+			style = MaterialTheme.typography.titleLarge,
+			color = VideoMaxTheme.extended.textPrimary
+		)
+		Spacer(modifier = Modifier.height(6.dp))
 		Text(
 			text = subtitle,
-			style = MaterialTheme.typography.bodyLarge,
-			color = MaterialTheme.colorScheme.onSurfaceVariant
+			style = MaterialTheme.typography.bodyMedium,
+			color = VideoMaxTheme.extended.textSecondary
 		)
 	}
 }
@@ -415,7 +445,9 @@ fun VideoContextMenu(
 ) {
 	DropdownMenu(
 		expanded = expanded,
-		onDismissRequest = onDismiss
+		onDismissRequest = onDismiss,
+		shape = RoundedCornerShape(16.dp),
+		containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
 	) {
 		DropdownMenuItem(
 			text = { Text("Mover a carpeta privada") },
@@ -448,4 +480,27 @@ fun VideoContextMenu(
 			leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) }
 		)
 	}
+}
+
+@Composable
+fun ShimmerBox(
+	modifier: Modifier = Modifier
+) {
+	val transition = rememberInfiniteTransition(label = "shimmer")
+	val alpha by transition.animateFloat(
+		initialValue = 0.3f,
+		targetValue = 0.6f,
+		animationSpec = infiniteRepeatable(
+			animation = tween(800, easing = LinearEasing),
+			repeatMode = RepeatMode.Reverse
+		),
+		label = "shimmerAlpha"
+	)
+	Box(
+		modifier = modifier
+			.background(
+				MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = alpha),
+				RoundedCornerShape(8.dp)
+			)
+	)
 }

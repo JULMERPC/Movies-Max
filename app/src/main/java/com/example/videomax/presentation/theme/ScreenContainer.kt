@@ -9,22 +9,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 
-/**
- * Standard screen gradient used across Library, Settings, Playlists, etc.
- */
 @Composable
 fun screenGradient(): Brush = Brush.verticalGradient(
 	colors = listOf(
-		MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
-		MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f),
-		MaterialTheme.colorScheme.background
+		MaterialTheme.colorScheme.surface,
+		MaterialTheme.colorScheme.surfaceContainerLow
 	)
 )
 
-/**
- * Standard screen container with the app gradient background.
- */
+@Composable
+fun scaffoldTintColor(): Color {
+	val primary = MaterialTheme.colorScheme.primary
+	return Color(primary.red, primary.green, primary.blue, 0.10f)
+		.compositeOver(Color.White)
+}
+
 @Composable
 fun ScreenContainer(
 	modifier: Modifier = Modifier,
@@ -33,7 +34,7 @@ fun ScreenContainer(
 	Box(
 		modifier = modifier
 			.fillMaxSize()
-			.background(screenGradient()),
+			.background(MaterialTheme.colorScheme.surface),
 		content = content
 	)
 }

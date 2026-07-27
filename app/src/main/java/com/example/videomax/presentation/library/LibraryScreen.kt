@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.automirrored.filled.ViewList
@@ -68,6 +69,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -81,6 +83,8 @@ import com.example.videomax.presentation.components.EmptyState
 import com.example.videomax.presentation.components.VideoGridItem
 import com.example.videomax.presentation.components.VideoListItem
 import com.example.videomax.presentation.components.VideoMenuAction
+import com.example.videomax.presentation.theme.VideoMaxDimens
+import com.example.videomax.presentation.theme.VideoMaxTheme
 import com.example.videomax.presentation.theme.screenGradient
 import kotlinx.coroutines.launch
 
@@ -267,7 +271,7 @@ fun LibraryScreen(
 			dismissButton = {
 				TextButton(onClick = { renameVideoId = null }) { Text("Cancelar") }
 			},
-			containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+			containerColor = MaterialTheme.colorScheme.surface
 		)
 	}
 
@@ -291,7 +295,7 @@ fun LibraryScreen(
 			dismissButton = {
 				TextButton(onClick = { deleteVideoId = null }) { Text("Cancelar") }
 			},
-			containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+			containerColor = MaterialTheme.colorScheme.surface
 		)
 	}
 
@@ -334,7 +338,7 @@ fun LibraryScreen(
 			confirmButton = {
 				TextButton(onClick = { playlistTargetVideoId = null }) { Text("Cancelar") }
 			},
-			containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+			containerColor = MaterialTheme.colorScheme.surface
 		)
 	}
 }
@@ -364,40 +368,45 @@ fun LibraryTopBar(
 		TopAppBar(
 			title = {
 				Column {
-					Text("videomax", style = MaterialTheme.typography.headlineSmall)
+					Text("videomax", style = MaterialTheme.typography.headlineSmall, color = VideoMaxTheme.extended.textPrimary)
 					Text(
 						text = "$videoCount videos",
 						style = MaterialTheme.typography.bodyMedium,
-						color = MaterialTheme.colorScheme.onSurfaceVariant
+						color = VideoMaxTheme.extended.textTertiary
 					)
 				}
 			},
 		actions = {
 			IconButton(onClick = onRefresh, enabled = !isScanning) {
 				Icon(
-					if (isScanning) Icons.Default.Refresh else Icons.Default.Refresh,
-					contentDescription = "Escanear"
+					Icons.Default.Refresh,
+					contentDescription = "Escanear",
+					tint = VideoMaxTheme.extended.textSecondary
 				)
 			}
 			IconButton(onClick = onToggleLayout) {
 					Icon(
 						if (isGrid) Icons.AutoMirrored.Filled.ViewList else Icons.Default.GridView,
-						contentDescription = "Cambiar vista"
+						contentDescription = "Cambiar vista",
+						tint = VideoMaxTheme.extended.textSecondary
 					)
 				}
 				IconButton(onClick = onToggleSearch) {
 					Icon(
 						if (isSearchOpen) Icons.Default.Close else Icons.Default.Search,
-						contentDescription = "Search"
+						contentDescription = "Search",
+						tint = VideoMaxTheme.extended.textSecondary
 					)
 				}
 				Box {
 					IconButton(onClick = { sortMenuExpanded = true }) {
-						Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort")
+						Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort", tint = VideoMaxTheme.extended.textSecondary)
 					}
 					DropdownMenu(
 						expanded = sortMenuExpanded,
-						onDismissRequest = { sortMenuExpanded = false }
+						onDismissRequest = { sortMenuExpanded = false },
+						shape = RoundedCornerShape(16.dp),
+						containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
 					) {
 						SortOption.entries.forEach { option ->
 							DropdownMenuItem(
@@ -412,7 +421,12 @@ fun LibraryTopBar(
 				}
 			},
 			colors = TopAppBarDefaults.topAppBarColors(
-				containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.35f),
+				containerColor = Color(
+					MaterialTheme.colorScheme.primary.red,
+					MaterialTheme.colorScheme.primary.green,
+					MaterialTheme.colorScheme.primary.blue,
+					0.10f
+				).compositeOver(Color.White),
 				titleContentColor = MaterialTheme.colorScheme.onSurface
 			)
 		)
@@ -427,7 +441,7 @@ fun LibraryTopBar(
 				onValueChange = onQueryChange,
 				modifier = Modifier
 					.fillMaxWidth()
-					.padding(horizontal = 16.dp, vertical = 4.dp),
+					.padding(horizontal = VideoMaxDimens.spacingLg, vertical = VideoMaxDimens.spacingXs),
 				placeholder = { Text("Buscar videos o carpetas") },
 				leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
 				singleLine = true,
@@ -448,8 +462,8 @@ fun FilterModeSelector(
 	onModeSelected: (LibraryFilterMode) -> Unit
 ) {
 	LazyRow(
-		contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-		horizontalArrangement = Arrangement.spacedBy(8.dp)
+		contentPadding = PaddingValues(horizontal = VideoMaxDimens.spacingLg, vertical = VideoMaxDimens.spacingSm),
+		horizontalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingSm)
 	) {
 		item {
 			FilterChip(
@@ -460,7 +474,7 @@ fun FilterModeSelector(
 					Icon(
 						Icons.Default.VideoFile,
 						contentDescription = null,
-						modifier = Modifier.size(18.dp)
+						modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
 					)
 				}
 			)
@@ -474,7 +488,7 @@ fun FilterModeSelector(
 					Icon(
 						Icons.Default.Folder,
 						contentDescription = null,
-						modifier = Modifier.size(18.dp)
+						modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
 					)
 				}
 			)
@@ -488,7 +502,7 @@ fun FilterModeSelector(
 					Icon(
 						Icons.Default.CreateNewFolder,
 						contentDescription = null,
-						modifier = Modifier.size(18.dp)
+						modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
 					)
 				}
 			)
@@ -510,9 +524,9 @@ fun FolderGrid(
 	}
 	LazyVerticalGrid(
 		columns = GridCells.Adaptive(168.dp),
-		contentPadding = PaddingValues(12.dp),
-		verticalArrangement = Arrangement.spacedBy(10.dp),
-		horizontalArrangement = Arrangement.spacedBy(10.dp),
+		contentPadding = PaddingValues(VideoMaxDimens.spacingMd),
+		verticalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingSm),
+		horizontalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingSm),
 		modifier = Modifier.fillMaxSize()
 	) {
 		items(folders.size, key = { folders[it] }) { index ->
@@ -521,24 +535,29 @@ fun FolderGrid(
 			Surface(
 				modifier = Modifier
 					.fillMaxWidth()
+					.aspectRatio(1.4f)
 					.clickable { onFolderClick(folder) },
 				shape = MaterialTheme.shapes.medium,
-				color = MaterialTheme.colorScheme.surface.copy(alpha = 0.55f)
+				color = MaterialTheme.colorScheme.surfaceContainerHigh
 			) {
-				Row(
-					modifier = Modifier.padding(16.dp),
-					verticalAlignment = Alignment.CenterVertically
+				Column(
+					modifier = Modifier
+						.fillMaxSize()
+						.padding(VideoMaxDimens.spacingMd),
+					verticalArrangement = Arrangement.Center,
+					horizontalAlignment = Alignment.CenterHorizontally
 				) {
 					Icon(
 						Icons.Default.Folder,
 						contentDescription = null,
 						tint = MaterialTheme.colorScheme.primary,
-						modifier = Modifier.size(32.dp)
+						modifier = Modifier.size(VideoMaxDimens.iconSizeXl)
 					)
-					Spacer(modifier = Modifier.width(12.dp))
+					Spacer(modifier = Modifier.height(VideoMaxDimens.spacingSm))
 					Text(
 						text = folderName,
-						style = MaterialTheme.typography.bodyLarge,
+						style = MaterialTheme.typography.bodyMedium,
+						color = VideoMaxTheme.extended.textPrimary,
 						maxLines = 2,
 						overflow = TextOverflow.Ellipsis
 					)
@@ -565,8 +584,8 @@ fun FolderTree(
 
 	LazyColumn(
 		modifier = Modifier.fillMaxSize(),
-		contentPadding = PaddingValues(12.dp),
-		verticalArrangement = Arrangement.spacedBy(2.dp)
+		contentPadding = PaddingValues(VideoMaxDimens.spacingMd),
+		verticalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingXxs)
 	) {
 		items(tree.size, key = { tree[it].path }) { index ->
 			val node = tree[index]
@@ -588,23 +607,24 @@ private fun FolderTreeNode(
 			.fillMaxWidth()
 			.clickable(onClick = onClick)
 			.padding(
-				start = (16 + node.depth * 24).dp,
-				top = 6.dp,
-				bottom = 6.dp,
-				end = 16.dp
+				start = (VideoMaxDimens.spacingLg.value.toInt() + node.depth * 24).dp,
+				top = VideoMaxDimens.spacingSm,
+				bottom = VideoMaxDimens.spacingSm,
+				end = VideoMaxDimens.spacingLg
 			),
 		verticalAlignment = Alignment.CenterVertically
 	) {
 		Icon(
 			if (node.hasChildren) Icons.Default.FolderOpen else Icons.Default.Folder,
 			contentDescription = null,
-			tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-			modifier = Modifier.size(20.dp)
+			tint = MaterialTheme.colorScheme.primary.copy(alpha = VideoMaxDimens.alphaHigh),
+			modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
 		)
-		Spacer(modifier = Modifier.width(8.dp))
+		Spacer(modifier = Modifier.width(VideoMaxDimens.spacingSm))
 		Text(
 			text = node.name,
 			style = MaterialTheme.typography.bodyMedium,
+			color = VideoMaxTheme.extended.textPrimary,
 			maxLines = 1,
 			overflow = TextOverflow.Ellipsis
 		)
@@ -693,9 +713,9 @@ fun VideoContent(
 			if (isGrid) {
 				LazyVerticalGrid(
 					columns = GridCells.Adaptive(168.dp),
-					contentPadding = PaddingValues(12.dp),
-					verticalArrangement = Arrangement.spacedBy(14.dp),
-					horizontalArrangement = Arrangement.spacedBy(12.dp),
+					contentPadding = PaddingValues(VideoMaxDimens.spacingMd),
+					verticalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingLg),
+					horizontalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingMd),
 					modifier = Modifier.fillMaxSize()
 				) {
 					items(
@@ -719,7 +739,7 @@ fun VideoContent(
 			} else {
 				LazyColumn(
 					modifier = Modifier.fillMaxSize(),
-					contentPadding = PaddingValues(vertical = 8.dp)
+					contentPadding = PaddingValues(vertical = VideoMaxDimens.spacingSm)
 				) {
 					items(
 						count = pagingItems.itemCount,
@@ -748,9 +768,9 @@ private fun LibraryLoadingPlaceholders(isGrid: Boolean) {
 	if (isGrid) {
 		LazyVerticalGrid(
 			columns = GridCells.Adaptive(168.dp),
-			contentPadding = PaddingValues(12.dp),
-			verticalArrangement = Arrangement.spacedBy(14.dp),
-			horizontalArrangement = Arrangement.spacedBy(12.dp),
+			contentPadding = PaddingValues(VideoMaxDimens.spacingMd),
+			verticalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingLg),
+			horizontalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingMd),
 			modifier = Modifier.fillMaxSize(),
 			userScrollEnabled = false
 		) {
@@ -759,7 +779,7 @@ private fun LibraryLoadingPlaceholders(isGrid: Boolean) {
 	} else {
 		LazyColumn(
 			modifier = Modifier.fillMaxSize(),
-			contentPadding = PaddingValues(vertical = 8.dp),
+			contentPadding = PaddingValues(vertical = VideoMaxDimens.spacingSm),
 			userScrollEnabled = false
 		) {
 			items(10) { VideoListSkeleton() }
@@ -775,23 +795,23 @@ private fun VideoGridSkeleton() {
 				.fillMaxWidth()
 				.aspectRatio(16f / 9f),
 			shape = MaterialTheme.shapes.medium,
-			color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+			color = MaterialTheme.colorScheme.surfaceContainerHigh
 		) {}
-		Spacer(modifier = Modifier.height(8.dp))
+		Spacer(modifier = Modifier.height(VideoMaxDimens.spacingSm))
 		Surface(
 			modifier = Modifier
 				.fillMaxWidth(0.9f)
 				.height(14.dp),
 			shape = MaterialTheme.shapes.small,
-			color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+			color = MaterialTheme.colorScheme.surfaceContainerHigh
 		) {}
-		Spacer(modifier = Modifier.height(6.dp))
+		Spacer(modifier = Modifier.height(VideoMaxDimens.spacingXs))
 		Surface(
 			modifier = Modifier
 				.fillMaxWidth(0.55f)
 				.height(12.dp),
 			shape = MaterialTheme.shapes.small,
-			color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+			color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = VideoMaxDimens.alphaDisabled)
 		) {}
 	}
 }
@@ -801,31 +821,31 @@ private fun VideoListSkeleton() {
 	Row(
 		modifier = Modifier
 			.fillMaxWidth()
-			.padding(horizontal = 16.dp, vertical = 8.dp)
+			.padding(horizontal = VideoMaxDimens.spacingLg, vertical = VideoMaxDimens.spacingSm)
 	) {
 		Surface(
 			modifier = Modifier
 				.width(120.dp)
 				.aspectRatio(16f / 9f),
 			shape = MaterialTheme.shapes.medium,
-			color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+			color = MaterialTheme.colorScheme.surfaceContainerHigh
 		) {}
-		Spacer(modifier = Modifier.width(12.dp))
+		Spacer(modifier = Modifier.width(VideoMaxDimens.spacingMd))
 		Column(modifier = Modifier.weight(1f)) {
 			Surface(
 				modifier = Modifier
 					.fillMaxWidth(0.85f)
 					.height(16.dp),
 				shape = MaterialTheme.shapes.small,
-				color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+				color = MaterialTheme.colorScheme.surfaceContainerHigh
 			) {}
-			Spacer(modifier = Modifier.height(8.dp))
+			Spacer(modifier = Modifier.height(VideoMaxDimens.spacingSm))
 			Surface(
 				modifier = Modifier
 					.fillMaxWidth(0.45f)
 					.height(12.dp),
 				shape = MaterialTheme.shapes.small,
-				color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+				color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = VideoMaxDimens.alphaDisabled)
 			) {}
 		}
 	}

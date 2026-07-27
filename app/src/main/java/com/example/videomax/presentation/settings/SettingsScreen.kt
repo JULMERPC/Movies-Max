@@ -8,17 +8,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Gesture
 import androidx.compose.material.icons.filled.HideImage
@@ -39,10 +38,11 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -55,6 +55,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -63,6 +64,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.videomax.R
 import com.example.videomax.domain.model.ThemeMode
 import com.example.videomax.util.Formatters
+import com.example.videomax.presentation.theme.VideoMaxDimens
+import com.example.videomax.presentation.theme.VideoMaxTheme
 import com.example.videomax.presentation.theme.screenGradient
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -79,9 +82,14 @@ fun SettingsScreen(
 		containerColor = Color.Transparent,
 		topBar = {
 			TopAppBar(
-				title = { Text(stringResource(R.string.settings_title)) },
+				title = { Text(stringResource(R.string.settings_title), color = VideoMaxTheme.extended.textPrimary) },
 				colors = TopAppBarDefaults.topAppBarColors(
-					containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.35f),
+					containerColor = Color(
+						MaterialTheme.colorScheme.primary.red,
+						MaterialTheme.colorScheme.primary.green,
+						MaterialTheme.colorScheme.primary.blue,
+						0.10f
+					).compositeOver(Color.White),
 					titleContentColor = MaterialTheme.colorScheme.onSurface
 				)
 			)
@@ -97,8 +105,8 @@ fun SettingsScreen(
 				modifier = Modifier
 					.fillMaxSize()
 					.verticalScroll(rememberScrollState())
-					.padding(horizontal = 16.dp, vertical = 8.dp),
-				verticalArrangement = Arrangement.spacedBy(14.dp)
+					.padding(horizontal = VideoMaxDimens.spacingLg, vertical = VideoMaxDimens.spacingSm),
+				verticalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingLg)
 			) {
 				GlassSection(title = stringResource(R.string.settings_appearance)) {
 					ThemeDropdown(
@@ -123,23 +131,35 @@ fun SettingsScreen(
 							R.string.settings_speed,
 							Formatters.formatSpeed(settings.defaultPlaybackSpeed)
 						),
-						style = MaterialTheme.typography.bodyMedium
+						style = MaterialTheme.typography.bodyMedium,
+						color = VideoMaxTheme.extended.textPrimary
 					)
 					Slider(
 						value = settings.defaultPlaybackSpeed,
 						onValueChange = viewModel::setSpeed,
 						valueRange = 0.25f..2.5f,
-						steps = 8
+						steps = 8,
+						colors = SliderDefaults.colors(
+							thumbColor = MaterialTheme.colorScheme.primary,
+							activeTrackColor = MaterialTheme.colorScheme.primary,
+							inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHigh
+						)
 					)
 					Text(
 						text = stringResource(R.string.settings_seek_step, settings.seekStepSeconds),
-						style = MaterialTheme.typography.bodyMedium
+						style = MaterialTheme.typography.bodyMedium,
+						color = VideoMaxTheme.extended.textPrimary
 					)
 					Slider(
 						value = settings.seekStepSeconds.toFloat(),
 						onValueChange = { viewModel.setSeekStep(it.toInt()) },
 						valueRange = 5f..30f,
-						steps = 4
+						steps = 4,
+						colors = SliderDefaults.colors(
+							thumbColor = MaterialTheme.colorScheme.primary,
+							activeTrackColor = MaterialTheme.colorScheme.primary,
+							inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHigh
+						)
 					)
 				}
 
@@ -189,15 +209,15 @@ fun SettingsScreen(
 				}
 
 				GlassSection(title = stringResource(R.string.settings_about)) {
-					Text("videomax", style = MaterialTheme.typography.titleMedium)
+					Text("videomax", style = MaterialTheme.typography.titleMedium, color = VideoMaxTheme.extended.textPrimary)
 					Text(
 						text = stringResource(R.string.settings_about_desc),
 						style = MaterialTheme.typography.bodyMedium,
-						color = MaterialTheme.colorScheme.onSurfaceVariant
+						color = VideoMaxTheme.extended.textTertiary
 					)
 				}
 
-				Spacer(modifier = Modifier.height(24.dp))
+				Spacer(modifier = Modifier.height(VideoMaxDimens.spacingXxl))
 			}
 		}
 	}
@@ -215,6 +235,7 @@ private fun ThemeDropdown(
 		ThemeMode.SYSTEM -> stringResource(R.string.theme_system)
 		ThemeMode.LIGHT -> stringResource(R.string.theme_light)
 		ThemeMode.DARK -> stringResource(R.string.theme_dark)
+		ThemeMode.AMOLED -> stringResource(R.string.theme_amoled)
 	}
 
 	ExposedDropdownMenuBox(
@@ -231,26 +252,29 @@ private fun ThemeDropdown(
 				.fillMaxWidth()
 				.menuAnchor(MenuAnchorType.PrimaryNotEditable),
 			colors = OutlinedTextFieldDefaults.colors(
-				unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-				focusedTextColor = MaterialTheme.colorScheme.onSurface
+				unfocusedTextColor = VideoMaxTheme.extended.textPrimary,
+				focusedTextColor = VideoMaxTheme.extended.textPrimary
 			)
 		)
 		ExposedDropdownMenu(
 			expanded = expanded,
-			onDismissRequest = { expanded = false }
+			onDismissRequest = { expanded = false },
+			shape = RoundedCornerShape(16.dp),
+			containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
 		) {
 			ThemeMode.entries.forEach { mode ->
 				val modeLabel = when (mode) {
 					ThemeMode.SYSTEM -> stringResource(R.string.theme_system)
 					ThemeMode.LIGHT -> stringResource(R.string.theme_light)
 					ThemeMode.DARK -> stringResource(R.string.theme_dark)
+					ThemeMode.AMOLED -> stringResource(R.string.theme_amoled)
 				}
 				DropdownMenuItem(
 					text = {
 						Text(
 							text = modeLabel,
 							color = if (mode == selected) MaterialTheme.colorScheme.primary
-							else MaterialTheme.colorScheme.onSurface
+							else VideoMaxTheme.extended.textPrimary
 						)
 					},
 					onClick = {
@@ -272,31 +296,32 @@ private fun GlassSection(
 	Surface(
 		modifier = Modifier
 			.fillMaxWidth()
-			.clip(RoundedCornerShape(24.dp))
+			.clip(RoundedCornerShape(VideoMaxDimens.radiusXl))
 			.border(
 				width = 1.dp,
 				brush = Brush.linearGradient(
 					listOf(
-						Color.White.copy(alpha = 0.35f),
-						MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+						Color.White.copy(alpha = 0.12f),
+						MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
 					)
 				),
-				shape = RoundedCornerShape(24.dp)
+				shape = RoundedCornerShape(VideoMaxDimens.radiusXl)
 			),
-		color = MaterialTheme.colorScheme.surface.copy(alpha = 0.55f),
-		tonalElevation = 0.dp,
-		shadowElevation = 0.dp,
-		shape = RoundedCornerShape(24.dp)
+		color = MaterialTheme.colorScheme.surface.copy(alpha = VideoMaxDimens.alphaSurfaceGlassHover),
+		tonalElevation = VideoMaxDimens.elevationNone,
+		shadowElevation = VideoMaxDimens.elevationNone,
+		shape = RoundedCornerShape(VideoMaxDimens.radiusXl)
 	) {
-		Column(modifier = Modifier.padding(16.dp)) {
+		Column(modifier = Modifier.padding(VideoMaxDimens.spacingLg)) {
 			Row(verticalAlignment = Alignment.CenterVertically) {
 				if (icon != null) {
 					Icon(
 						imageVector = icon,
 						contentDescription = null,
-						tint = MaterialTheme.colorScheme.primary
+						tint = MaterialTheme.colorScheme.primary,
+						modifier = Modifier.size(VideoMaxDimens.iconSizeMd)
 					)
-					Spacer(modifier = Modifier.padding(6.dp))
+					Spacer(modifier = Modifier.padding(VideoMaxDimens.spacingXs))
 				}
 				Text(
 					text = title,
@@ -304,7 +329,7 @@ private fun GlassSection(
 					color = MaterialTheme.colorScheme.primary
 				)
 			}
-			Spacer(modifier = Modifier.height(12.dp))
+			Spacer(modifier = Modifier.height(VideoMaxDimens.spacingMd))
 			content()
 		}
 	}
@@ -321,23 +346,39 @@ private fun GlassSwitchRow(
 	onClick: (() -> Unit)? = null
 ) {
 	ListItem(
-		headlineContent = { Text(title) },
-		supportingContent = subtitle?.let { { Text(it) } },
+		headlineContent = {
+			Text(title, color = VideoMaxTheme.extended.textPrimary)
+		},
+		supportingContent = subtitle?.let {
+			{ Text(it, color = VideoMaxTheme.extended.textTertiary) }
+		},
 		leadingContent = icon?.let {
 			{
-				Icon(it, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+				Icon(
+					it,
+					contentDescription = null,
+					tint = MaterialTheme.colorScheme.primary,
+					modifier = Modifier.size(VideoMaxDimens.iconSizeMd)
+				)
 			}
 		},
 		trailingContent = {
 			if (isToggle) {
-				Switch(checked = checked, onCheckedChange = onCheckedChange ?: {})
+				Switch(
+					checked = checked,
+					onCheckedChange = onCheckedChange ?: {},
+					colors = SwitchDefaults.colors(
+						checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+						checkedTrackColor = MaterialTheme.colorScheme.primary
+					)
+				)
 			} else if (onClick != null) {
 				Icon(
-					imageVector = Icons.Default.Visibility,
+					imageVector = Icons.Default.ChevronRight,
 					contentDescription = null,
-					tint = MaterialTheme.colorScheme.onSurfaceVariant,
+					tint = VideoMaxTheme.extended.textTertiary,
 					modifier = Modifier
-						.size(20.dp)
+						.size(VideoMaxDimens.iconSizeMd)
 						.clickable { onClick() }
 				)
 			}

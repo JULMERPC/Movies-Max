@@ -18,14 +18,18 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -35,6 +39,8 @@ import com.example.videomax.domain.model.Video
 import com.example.videomax.domain.usecase.GetVideoByIdUseCase
 import com.example.videomax.presentation.components.VideoThumbnail
 import com.example.videomax.presentation.player.PlaybackQueue
+import com.example.videomax.presentation.theme.VideoMaxDimens
+import com.example.videomax.presentation.theme.VideoMaxTheme
 import com.example.videomax.util.Formatters
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -76,12 +82,20 @@ fun DetailsScreen(
 	Scaffold(
 		topBar = {
 			TopAppBar(
-			title = { Text(video?.displayName ?: "Detalles") },
+			title = { Text(video?.displayName ?: "Detalles", color = VideoMaxTheme.extended.textPrimary) },
 			navigationIcon = {
 				IconButton(onClick = onBack) {
-					Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+					Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = VideoMaxTheme.extended.textPrimary)
 					}
-				}
+				},
+			colors = TopAppBarDefaults.topAppBarColors(
+				containerColor = Color(
+					MaterialTheme.colorScheme.primary.red,
+					MaterialTheme.colorScheme.primary.green,
+					MaterialTheme.colorScheme.primary.blue,
+					0.10f
+				).compositeOver(Color.White)
+			)
 			)
 		}
 	) { padding ->
@@ -91,16 +105,16 @@ fun DetailsScreen(
 				.fillMaxSize()
 				.padding(padding)
 				.verticalScroll(rememberScrollState())
-				.padding(16.dp)
+				.padding(VideoMaxDimens.spacingLg)
 		) {
 			VideoThumbnail(
 				uri = current.uri,
 				modifier = Modifier
 					.fillMaxWidth()
 					.aspectRatio(16f / 9f)
-					.clip(RoundedCornerShape(16.dp))
+					.clip(RoundedCornerShape(VideoMaxDimens.radiusLg))
 			)
-			Spacer(modifier = Modifier.height(16.dp))
+			Spacer(modifier = Modifier.height(VideoMaxDimens.spacingLg))
 			Button(
 				onClick = {
 					viewModel.preparePlayback()
@@ -109,16 +123,16 @@ fun DetailsScreen(
 				modifier = Modifier.fillMaxWidth()
 			) {
 				Icon(Icons.Default.PlayArrow, contentDescription = null)
-				Spacer(modifier = Modifier.height(0.dp))
+				Spacer(modifier = Modifier.height(VideoMaxDimens.spacingNone))
 				Text("Reproducir")
 			}
-			Spacer(modifier = Modifier.height(8.dp))
-			InfoRow("Resolucion", current.resolutionLabel)
-			InfoRow("Duracion", Formatters.formatDuration(current.durationMs))
-			InfoRow("Tamano", Formatters.formatFileSize(current.sizeBytes))
+			Spacer(modifier = Modifier.height(VideoMaxDimens.spacingSm))
+			InfoRow("Resolución", current.resolutionLabel)
+			InfoRow("Duración", Formatters.formatDuration(current.durationMs))
+			InfoRow("Tamaño", Formatters.formatFileSize(current.sizeBytes))
 			InfoRow("Codec / contenedor", current.codec ?: current.mimeType)
 			InfoRow("Carpeta", current.folderName)
-			InfoRow("Ubicacion", current.path ?: current.uri)
+			InfoRow("Ubicación", current.path ?: current.uri)
 			InfoRow("MIME", current.mimeType)
 		}
 	}
@@ -127,7 +141,8 @@ fun DetailsScreen(
 @Composable
 private fun InfoRow(label: String, value: String) {
 	ListItem(
-		headlineContent = { Text(label) },
-		supportingContent = { Text(value) }
+		headlineContent = { Text(label, color = VideoMaxTheme.extended.textTertiary) },
+		supportingContent = { Text(value, color = VideoMaxTheme.extended.textPrimary) },
+		colors = ListItemDefaults.colors(containerColor = Color.Transparent)
 	)
 }

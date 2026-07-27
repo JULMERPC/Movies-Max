@@ -20,7 +20,6 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,31 +34,29 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material.icons.filled.RepeatOne
-import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Flip
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -94,6 +91,8 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.example.videomax.domain.model.Video
 import com.example.videomax.presentation.components.VideoThumbnail
+import com.example.videomax.presentation.theme.VideoMaxDimens
+import com.example.videomax.presentation.theme.VideoMaxTheme
 import com.example.videomax.util.Formatters
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -171,7 +170,7 @@ import kotlinx.coroutines.launch
 
 	val animatedZoom by animateFloatAsState(
 		targetValue = zoomScale,
-		animationSpec = tween(150),
+		animationSpec = tween(VideoMaxDimens.animationFast),
 		label = "zoom"
 	)
 
@@ -201,8 +200,8 @@ import kotlinx.coroutines.launch
 
 		AnimatedVisibility(
 			visible = state.controlsVisible,
-			enter = fadeIn(tween(220)),
-			exit = fadeOut(tween(220))
+			enter = fadeIn(tween(VideoMaxDimens.animationNormal)),
+			exit = fadeOut(tween(VideoMaxDimens.animationNormal))
 		) {
 			PlayerControlsOverlay(
 				state = state,
@@ -271,24 +270,25 @@ private fun PlayerQueueSheet(
 	ModalBottomSheet(
 		onDismissRequest = onDismiss,
 		sheetState = sheetState,
-		containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+		containerColor = MaterialTheme.colorScheme.surface
 	) {
 		Column(
 			modifier = Modifier
 				.fillMaxWidth()
-				.padding(bottom = 32.dp)
+				.padding(bottom = VideoMaxDimens.spacingXxxl)
 		) {
 			Text(
 				text = "Cola de reproducción (${queueIds.size})",
 				style = MaterialTheme.typography.titleMedium,
-				modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+				color = VideoMaxTheme.extended.textPrimary,
+				modifier = Modifier.padding(horizontal = VideoMaxDimens.spacingXl, vertical = VideoMaxDimens.spacingSm)
 			)
 
 			Row(
-				horizontalArrangement = Arrangement.spacedBy(8.dp),
+				horizontalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingSm),
 				modifier = Modifier
 					.fillMaxWidth()
-					.padding(horizontal = 20.dp, vertical = 4.dp)
+					.padding(horizontal = VideoMaxDimens.spacingXl, vertical = VideoMaxDimens.spacingXs)
 			) {
 				FilledTonalButton(
 					onClick = {
@@ -302,9 +302,9 @@ private fun PlayerQueueSheet(
 					Icon(
 						imageVector = Icons.Default.Shuffle,
 						contentDescription = "Aleatorizar",
-						modifier = Modifier.size(18.dp)
+						modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
 					)
-					Spacer(modifier = Modifier.width(6.dp))
+					Spacer(modifier = Modifier.width(VideoMaxDimens.spacingSm))
 					Text("Aleatorizar", style = MaterialTheme.typography.labelMedium)
 				}
 
@@ -317,9 +317,9 @@ private fun PlayerQueueSheet(
 							else -> Icons.Default.Repeat
 						},
 						contentDescription = "Repetir",
-						modifier = Modifier.size(18.dp)
+						modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
 					)
-					Spacer(modifier = Modifier.width(6.dp))
+					Spacer(modifier = Modifier.width(VideoMaxDimens.spacingSm))
 					Text(
 						text = when (repeatMode) {
 							QueueRepeatMode.OFF -> "Repetir off"
@@ -335,8 +335,8 @@ private fun PlayerQueueSheet(
 				Text(
 					text = "Cola vacía",
 					style = MaterialTheme.typography.bodyMedium,
-					color = MaterialTheme.colorScheme.onSurfaceVariant,
-					modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
+					color = VideoMaxTheme.extended.textTertiary,
+					modifier = Modifier.padding(horizontal = VideoMaxDimens.spacingXl, vertical = VideoMaxDimens.spacingLg)
 				)
 			} else {
 				LazyColumn(
@@ -351,28 +351,28 @@ private fun PlayerQueueSheet(
 							modifier = Modifier
 								.fillMaxWidth()
 								.background(
-									if (isCurrent) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+									if (isCurrent) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
 									else Color.Transparent
 								)
 								.clickable {
 									viewModel.playQueueItem(index)
 								}
-								.padding(horizontal = 20.dp, vertical = 8.dp),
+								.padding(horizontal = VideoMaxDimens.spacingXl, vertical = VideoMaxDimens.spacingSm),
 							verticalAlignment = Alignment.CenterVertically
 						) {
 							Text(
 								text = "${index + 1}",
 								style = MaterialTheme.typography.labelMedium,
 								color = if (isCurrent) MaterialTheme.colorScheme.primary
-								else MaterialTheme.colorScheme.onSurfaceVariant,
+								else VideoMaxTheme.extended.textTertiary,
 								modifier = Modifier.width(28.dp)
 							)
 
 							Box(
 								modifier = Modifier
 									.size(width = 64.dp, height = 36.dp)
-									.clip(RoundedCornerShape(6.dp))
-									.background(MaterialTheme.colorScheme.surfaceVariant)
+									.clip(RoundedCornerShape(VideoMaxDimens.radiusSm))
+									.background(MaterialTheme.colorScheme.surfaceContainerHigh)
 							) {
 								if (video != null) {
 									VideoThumbnail(
@@ -384,32 +384,32 @@ private fun PlayerQueueSheet(
 								}
 							}
 
-							Spacer(modifier = Modifier.width(12.dp))
+							Spacer(modifier = Modifier.width(VideoMaxDimens.spacingMd))
 
 							Column(modifier = Modifier.weight(1f)) {
 								Text(
 									text = video?.displayName ?: "Video $videoId",
 									style = MaterialTheme.typography.bodyMedium,
 									color = if (isCurrent) MaterialTheme.colorScheme.primary
-									else MaterialTheme.colorScheme.onSurface,
+									else VideoMaxTheme.extended.textPrimary,
 									maxLines = 1,
-									overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+									overflow = TextOverflow.Ellipsis
 								)
 								if (video != null && video.durationMs > 0) {
 									Text(
 										text = Formatters.formatDuration(video.durationMs),
 										style = MaterialTheme.typography.labelSmall,
-										color = MaterialTheme.colorScheme.onSurfaceVariant
+										color = VideoMaxTheme.extended.textTertiary
 									)
 								}
 							}
 
 							if (isCurrent) {
 								Icon(
-									imageVector = androidx.compose.material.icons.Icons.Default.PlayArrow,
+									imageVector = Icons.Default.Equalizer,
 									contentDescription = null,
 									tint = MaterialTheme.colorScheme.primary,
-									modifier = Modifier.size(20.dp)
+									modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
 								)
 							}
 						}
@@ -481,12 +481,6 @@ private fun SetupAutoPip(activity: Activity, state: PlayerUiState) {
 	}
 }
 
-/**
- * Pauses the player and persists position when the Activity goes to background (ON_STOP)
- * or is being destroyed (ON_DESTROY). Prevents audio/video from playing in background.
- * If autoPiP is enabled, ON_STOP is deferred briefly to allow PiP transition to complete.
- * ON_DESTROY always cleans up as a safety net.
- */
 @Composable
 private fun SetupLifecyclePauser(activity: Activity, viewModel: PlayerViewModel, state: PlayerUiState) {
 	val lifecycleOwner = LocalLifecycleOwner.current
@@ -498,7 +492,6 @@ private fun SetupLifecyclePauser(activity: Activity, viewModel: PlayerViewModel,
 			when (event) {
 				Lifecycle.Event.ON_STOP -> {
 					if (latestAutoPip) {
-						// Give PiP transition time to activate; if it didn't, pause anyway.
 						scope.launch {
 							delay(300)
 							if (!activity.isInPictureInPictureMode) {
@@ -640,8 +633,8 @@ private fun PlayerControlsOverlay(
 	Box(modifier = Modifier.fillMaxSize()) {
 		AnimatedVisibility(
 			visible = true,
-			enter = fadeIn(tween(220)) + slideInVertically(tween(220)) { -it / 2 },
-			exit = fadeOut(tween(220)) + slideOutVertically(tween(220)) { -it / 2 },
+			enter = fadeIn(tween(VideoMaxDimens.animationNormal)) + slideInVertically(tween(VideoMaxDimens.animationNormal)) { -it / 2 },
+			exit = fadeOut(tween(VideoMaxDimens.animationNormal)) + slideOutVertically(tween(VideoMaxDimens.animationNormal)) { -it / 2 },
 			modifier = Modifier.align(Alignment.TopCenter)
 		) {
 			PlayerTopBar(
@@ -658,12 +651,12 @@ private fun PlayerControlsOverlay(
 
 		AnimatedVisibility(
 			visible = true,
-			enter = fadeIn(tween(220)) + slideInVertically(tween(220)) { -it / 2 },
-			exit = fadeOut(tween(220)) + slideOutVertically(tween(220)) { -it / 2 },
+			enter = fadeIn(tween(VideoMaxDimens.animationNormal)) + slideInVertically(tween(VideoMaxDimens.animationNormal)) { -it / 2 },
+			exit = fadeOut(tween(VideoMaxDimens.animationNormal)) + slideOutVertically(tween(VideoMaxDimens.animationNormal)) { -it / 2 },
 			modifier = Modifier
 				.align(Alignment.TopEnd)
 				.statusBarsPadding()
-				.padding(top = 4.dp, end = 6.dp)
+				.padding(top = VideoMaxDimens.spacingXs, end = VideoMaxDimens.spacingXs)
 		) {
 		PlayerSideActions(
 			isMuted = state.volumeFraction <= 0f,
@@ -694,8 +687,8 @@ private fun PlayerControlsOverlay(
 		if (!state.isLocked) {
 			AnimatedVisibility(
 				visible = true,
-				enter = fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 2 },
-				exit = fadeOut(tween(220)) + slideOutVertically(tween(220)) { it / 2 },
+				enter = fadeIn(tween(VideoMaxDimens.animationNormal)) + slideInVertically(tween(VideoMaxDimens.animationNormal)) { it / 2 },
+				exit = fadeOut(tween(VideoMaxDimens.animationNormal)) + slideOutVertically(tween(VideoMaxDimens.animationNormal)) { it / 2 },
 				modifier = Modifier.align(Alignment.BottomCenter)
 			) {
 				Column(
@@ -703,11 +696,11 @@ private fun PlayerControlsOverlay(
 						.fillMaxWidth()
 						.background(
 							Brush.verticalGradient(
-								listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f))
+								listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f))
 							)
 						)
 						.navigationBarsPadding()
-						.padding(horizontal = 14.dp, vertical = 6.dp)
+						.padding(horizontal = VideoMaxDimens.spacingLg, vertical = VideoMaxDimens.spacingSm)
 				) {
 					PlayerTimelineBar(
 						progressState = viewModel.progressState,
@@ -745,7 +738,9 @@ private fun PlayerControlsOverlay(
 			val speeds = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
 			DropdownMenu(
 				expanded = showSpeedMenu,
-				onDismissRequest = { showSpeedMenu = false }
+				onDismissRequest = { showSpeedMenu = false },
+				shape = RoundedCornerShape(16.dp),
+				containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
 			) {
 				speeds.forEach { speed ->
 					DropdownMenuItem(
@@ -754,7 +749,7 @@ private fun PlayerControlsOverlay(
 								text = "${speed}x",
 								style = MaterialTheme.typography.bodyMedium,
 								color = if (speed == state.playbackSpeed) MaterialTheme.colorScheme.primary
-								else MaterialTheme.colorScheme.onSurface
+								else VideoMaxTheme.extended.textPrimary
 							)
 						},
 						onClick = {
@@ -765,24 +760,31 @@ private fun PlayerControlsOverlay(
 				}
 			}
 		} else if (state.controlsVisible) {
-			Text(
-				text = "Pantalla bloqueada — toca el candado para desbloquear",
-				color = Color.White.copy(alpha = 0.8f),
-				style = MaterialTheme.typography.labelMedium,
+			Row(
+				verticalAlignment = Alignment.CenterVertically,
 				modifier = Modifier
 					.align(Alignment.BottomCenter)
 					.navigationBarsPadding()
-					.padding(16.dp)
-			)
-			IconButton(
-				onClick = viewModel::toggleLock,
-				modifier = Modifier
-					.align(Alignment.CenterEnd)
-					.padding(24.dp)
-					.size(48.dp)
-					.background(Color.Black.copy(alpha = 0.45f), androidx.compose.foundation.shape.CircleShape)
+					.padding(VideoMaxDimens.spacingLg)
+					.background(
+						Color.Black.copy(alpha = VideoMaxDimens.alphaOverlay),
+						RoundedCornerShape(VideoMaxDimens.radiusFull)
+					)
+					.padding(horizontal = VideoMaxDimens.spacingXl, vertical = VideoMaxDimens.spacingMd)
+					.clickable { viewModel.toggleLock() }
 			) {
-				Icon(Icons.Default.Lock, "Desbloquear", tint = Color.White)
+				Icon(
+					Icons.Default.Lock,
+					"Desbloquear",
+					tint = Color.White,
+					modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
+				)
+				Spacer(modifier = Modifier.width(VideoMaxDimens.spacingSm))
+				Text(
+					text = "Bloqueado",
+					color = Color.White.copy(alpha = VideoMaxDimens.alphaHigh),
+					style = MaterialTheme.typography.labelMedium
+				)
 			}
 		}
 	}
@@ -807,12 +809,13 @@ private fun VideoSettingsSheet(
 		Column(
 			modifier = Modifier
 				.fillMaxWidth()
-				.padding(bottom = 32.dp)
+				.padding(bottom = VideoMaxDimens.spacingXxxl)
 		) {
 			Text(
 				text = "Ajustes del video",
 				style = MaterialTheme.typography.titleMedium,
-				modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+				color = VideoMaxTheme.extended.textPrimary,
+				modifier = Modifier.padding(horizontal = VideoMaxDimens.spacingXl, vertical = VideoMaxDimens.spacingSm)
 			)
 
 			VideoSettingRow(
@@ -875,7 +878,7 @@ private fun VideoSettingRow(
 		modifier = Modifier
 			.fillMaxWidth()
 			.then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
-			.padding(horizontal = 20.dp, vertical = 12.dp),
+			.padding(horizontal = VideoMaxDimens.spacingXl, vertical = VideoMaxDimens.spacingMd),
 		verticalAlignment = Alignment.CenterVertically
 	) {
 		Icon(
@@ -884,21 +887,21 @@ private fun VideoSettingRow(
 			tint = when {
 				isDestructive -> MaterialTheme.colorScheme.error
 				isActive -> MaterialTheme.colorScheme.primary
-				else -> MaterialTheme.colorScheme.onSurfaceVariant
+				else -> VideoMaxTheme.extended.textTertiary
 			},
-			modifier = Modifier.size(22.dp)
+			modifier = Modifier.size(VideoMaxDimens.iconSizeMd)
 		)
-		Spacer(modifier = Modifier.width(16.dp))
+		Spacer(modifier = Modifier.width(VideoMaxDimens.spacingLg))
 		Column(modifier = Modifier.weight(1f)) {
 			Text(
 				text = title,
 				style = MaterialTheme.typography.bodyLarge,
-				color = if (isDestructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+				color = if (isDestructive) MaterialTheme.colorScheme.error else VideoMaxTheme.extended.textPrimary
 			)
 			Text(
 				text = subtitle,
 				style = MaterialTheme.typography.bodySmall,
-				color = MaterialTheme.colorScheme.onSurfaceVariant
+				color = VideoMaxTheme.extended.textTertiary
 			)
 		}
 		if (isActive) {
@@ -906,7 +909,7 @@ private fun VideoSettingRow(
 				imageVector = Icons.Default.Check,
 				contentDescription = null,
 				tint = MaterialTheme.colorScheme.primary,
-				modifier = Modifier.size(18.dp)
+				modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
 			)
 		}
 	}

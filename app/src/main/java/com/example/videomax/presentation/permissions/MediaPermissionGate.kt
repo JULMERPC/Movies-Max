@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.Button
@@ -22,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import android.app.Activity
 import androidx.compose.ui.platform.LocalContext
+import com.example.videomax.presentation.theme.VideoMaxDimens
+import com.example.videomax.presentation.theme.VideoMaxTheme
 
 @Composable
 fun MediaPermissionGate(
@@ -35,28 +38,30 @@ fun MediaPermissionGate(
 		Column(
 			modifier = Modifier
 				.fillMaxSize()
-				.padding(32.dp),
+				.padding(VideoMaxDimens.spacingXxxl),
 			verticalArrangement = Arrangement.Center,
 			horizontalAlignment = Alignment.CenterHorizontally
 		) {
 			Icon(
 				imageVector = Icons.Default.VideoLibrary,
 				contentDescription = null,
-				tint = MaterialTheme.colorScheme.primary
+				tint = MaterialTheme.colorScheme.primary,
+				modifier = Modifier.size(64.dp)
 			)
-			Spacer(modifier = Modifier.height(16.dp))
+			Spacer(modifier = Modifier.height(VideoMaxDimens.spacingLg))
 			Text(
-				text = "Access your videos",
-				style = MaterialTheme.typography.headlineMedium
+				text = "Accedé a tus videos",
+				style = MaterialTheme.typography.headlineMedium,
+				color = VideoMaxTheme.extended.textPrimary
 			)
-			Spacer(modifier = Modifier.height(8.dp))
+			Spacer(modifier = Modifier.height(VideoMaxDimens.spacingSm))
 			Text(
-				text = "videomax needs permission to scan and play videos stored on this device.",
+				text = "videomax necesita permiso para escanear y reproducir los videos almacenados en este dispositivo.",
 				style = MaterialTheme.typography.bodyLarge,
-				color = MaterialTheme.colorScheme.onSurfaceVariant,
+				color = VideoMaxTheme.extended.textTertiary,
 				textAlign = TextAlign.Center
 			)
-			Spacer(modifier = Modifier.height(24.dp))
+			Spacer(modifier = Modifier.height(VideoMaxDimens.spacingXxl))
 			Button(onClick = onRequestPermission) {
 				Text("Conceder acceso")
 			}
@@ -64,12 +69,6 @@ fun MediaPermissionGate(
 	}
 }
 
-/**
- * Returns the appropriate media permission string based on API level.
- * - API 34+ (Android 14+): READ_MEDIA_VISUAL_USER_SELECTED (partial access)
- * - API 33 (Android 13): READ_MEDIA_VIDEO
- * - API 32 and below: READ_EXTERNAL_STORAGE
- */
 fun requiredMediaPermission(): String =
 	when {
 		Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE ->
@@ -80,11 +79,6 @@ fun requiredMediaPermission(): String =
 			Manifest.permission.READ_EXTERNAL_STORAGE
 	}
 
-/**
- * Checks if the app has sufficient media access permission.
- * On Android 14+, READ_MEDIA_VISUAL_USER_SELECTED grants partial access.
- * Also checks READ_MEDIA_VIDEO since it may be co-granted for full access.
- */
 fun hasMediaPermission(activity: Activity): Boolean {
 	val selected = ContextCompat.checkSelfPermission(
 		activity, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED

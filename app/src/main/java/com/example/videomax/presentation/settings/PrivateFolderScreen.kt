@@ -22,7 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Lock
@@ -48,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
@@ -58,6 +58,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import coil.compose.AsyncImage
+import com.example.videomax.presentation.theme.VideoMaxDimens
+import com.example.videomax.presentation.theme.VideoMaxTheme
 import com.example.videomax.presentation.theme.screenGradient
 import coil.request.ImageRequest
 import coil.decode.VideoFrameDecoder
@@ -156,15 +158,19 @@ fun PrivateFolderScreen(
 		containerColor = Color.Transparent,
 		topBar = {
 			TopAppBar(
-				title = { Text("Carpeta privada") },
+				title = { Text("Carpeta privada", color = VideoMaxTheme.extended.textPrimary) },
 				navigationIcon = {
 					IconButton(onClick = onBack) {
-						Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver")
+						Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver", tint = VideoMaxTheme.extended.textPrimary)
 					}
 				},
 				colors = TopAppBarDefaults.topAppBarColors(
-					containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.35f),
-					titleContentColor = MaterialTheme.colorScheme.onSurface
+					containerColor = Color(
+						MaterialTheme.colorScheme.primary.red,
+						MaterialTheme.colorScheme.primary.green,
+						MaterialTheme.colorScheme.primary.blue,
+						0.10f
+					).compositeOver(Color.White)
 				)
 			)
 		}
@@ -240,7 +246,7 @@ private fun SetPinContent(
 	Column(
 		modifier = Modifier
 			.fillMaxSize()
-			.padding(32.dp),
+			.padding(VideoMaxDimens.spacingXxxl),
 		horizontalAlignment = Alignment.CenterHorizontally,
 		verticalArrangement = Arrangement.Center
 	) {
@@ -250,19 +256,19 @@ private fun SetPinContent(
 			tint = MaterialTheme.colorScheme.primary,
 			modifier = Modifier.size(64.dp)
 		)
-		Spacer(modifier = Modifier.height(24.dp))
+		Spacer(modifier = Modifier.height(VideoMaxDimens.spacingXxl))
 		Text(
 			text = "Crear carpeta privada",
 			style = MaterialTheme.typography.headlineSmall,
-			color = MaterialTheme.colorScheme.onSurface
+			color = VideoMaxTheme.extended.textPrimary
 		)
-		Spacer(modifier = Modifier.height(8.dp))
+		Spacer(modifier = Modifier.height(VideoMaxDimens.spacingSm))
 		Text(
 			text = "Ingresa un PIN de 4 dígitos para proteger tus videos",
 			style = MaterialTheme.typography.bodyMedium,
-			color = MaterialTheme.colorScheme.onSurfaceVariant
+			color = VideoMaxTheme.extended.textTertiary
 		)
-		Spacer(modifier = Modifier.height(32.dp))
+		Spacer(modifier = Modifier.height(VideoMaxDimens.spacingXxxl))
 
 		OutlinedTextField(
 			value = pin,
@@ -273,7 +279,7 @@ private fun SetPinContent(
 			singleLine = true,
 			modifier = Modifier.fillMaxWidth()
 		)
-		Spacer(modifier = Modifier.height(12.dp))
+		Spacer(modifier = Modifier.height(VideoMaxDimens.spacingMd))
 
 		OutlinedTextField(
 			value = confirmPin,
@@ -286,11 +292,11 @@ private fun SetPinContent(
 		)
 
 		if (error != null) {
-			Spacer(modifier = Modifier.height(8.dp))
+			Spacer(modifier = Modifier.height(VideoMaxDimens.spacingSm))
 			Text(text = error!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
 		}
 
-		Spacer(modifier = Modifier.height(24.dp))
+		Spacer(modifier = Modifier.height(VideoMaxDimens.spacingXxl))
 
 		TextButton(
 			onClick = {
@@ -305,7 +311,7 @@ private fun SetPinContent(
 			Text("Crear carpeta privada")
 		}
 
-		Spacer(modifier = Modifier.height(8.dp))
+		Spacer(modifier = Modifier.height(VideoMaxDimens.spacingSm))
 
 		TextButton(onClick = onBack) {
 			Text("Cancelar")
@@ -325,7 +331,7 @@ private fun VerifyPinContent(
 	Column(
 		modifier = Modifier
 			.fillMaxSize()
-			.padding(32.dp),
+			.padding(VideoMaxDimens.spacingXxxl),
 		horizontalAlignment = Alignment.CenterHorizontally,
 		verticalArrangement = Arrangement.Center
 	) {
@@ -335,19 +341,19 @@ private fun VerifyPinContent(
 			tint = MaterialTheme.colorScheme.primary,
 			modifier = Modifier.size(64.dp)
 		)
-		Spacer(modifier = Modifier.height(24.dp))
+		Spacer(modifier = Modifier.height(VideoMaxDimens.spacingXxl))
 		Text(
 			text = "Carpeta privada",
 			style = MaterialTheme.typography.headlineSmall,
-			color = MaterialTheme.colorScheme.onSurface
+			color = VideoMaxTheme.extended.textPrimary
 		)
-		Spacer(modifier = Modifier.height(8.dp))
+		Spacer(modifier = Modifier.height(VideoMaxDimens.spacingSm))
 		Text(
 			text = "Ingresa el PIN para acceder",
 			style = MaterialTheme.typography.bodyMedium,
-			color = MaterialTheme.colorScheme.onSurfaceVariant
+			color = VideoMaxTheme.extended.textTertiary
 		)
-		Spacer(modifier = Modifier.height(32.dp))
+		Spacer(modifier = Modifier.height(VideoMaxDimens.spacingXxxl))
 
 		OutlinedTextField(
 			value = input,
@@ -365,11 +371,11 @@ private fun VerifyPinContent(
 		)
 
 		if (error) {
-			Spacer(modifier = Modifier.height(8.dp))
+			Spacer(modifier = Modifier.height(VideoMaxDimens.spacingSm))
 			Text(text = "PIN incorrecto", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
 		}
 
-		Spacer(modifier = Modifier.height(24.dp))
+		Spacer(modifier = Modifier.height(VideoMaxDimens.spacingXxl))
 
 		TextButton(onClick = onBack) {
 			Text("Cancelar")
@@ -390,7 +396,7 @@ private fun PrivateFolderContent(
 	Column(
 		modifier = Modifier
 			.fillMaxSize()
-			.padding(16.dp)
+			.padding(VideoMaxDimens.spacingLg)
 	) {
 		Row(
 			modifier = Modifier.fillMaxWidth(),
@@ -400,7 +406,7 @@ private fun PrivateFolderContent(
 			Text(
 				text = "${privateVideos.size} videos protegidos",
 				style = MaterialTheme.typography.titleMedium,
-				color = MaterialTheme.colorScheme.onSurface
+				color = VideoMaxTheme.extended.textPrimary
 			)
 			Row {
 				TextButton(onClick = onChangePin) { Text("Cambiar PIN") }
@@ -408,37 +414,36 @@ private fun PrivateFolderContent(
 			}
 		}
 
-		Spacer(modifier = Modifier.height(8.dp))
+		Spacer(modifier = Modifier.height(VideoMaxDimens.spacingSm))
 
-
-		Spacer(modifier = Modifier.height(16.dp))
+		Spacer(modifier = Modifier.height(VideoMaxDimens.spacingLg))
 
 		if (privateVideos.isEmpty()) {
 			Box(
-				modifier = Modifier.fillMaxWidth().padding(top = 48.dp),
+				modifier = Modifier.fillMaxWidth().padding(top = VideoMaxDimens.spacingXxxxl),
 				contentAlignment = Alignment.Center
 			) {
 				Column(horizontalAlignment = Alignment.CenterHorizontally) {
 					Icon(
 						imageVector = Icons.Default.Lock,
 						contentDescription = null,
-						tint = MaterialTheme.colorScheme.onSurfaceVariant,
+						tint = VideoMaxTheme.extended.textTertiary,
 						modifier = Modifier.size(48.dp)
 					)
-					Spacer(modifier = Modifier.height(12.dp))
+					Spacer(modifier = Modifier.height(VideoMaxDimens.spacingMd))
 					Text(
 						text = "No hay videos en la carpeta privada",
 						style = MaterialTheme.typography.bodyMedium,
-						color = MaterialTheme.colorScheme.onSurfaceVariant
+						color = VideoMaxTheme.extended.textTertiary
 					)
 				}
 			}
 		} else {
 			LazyVerticalGrid(
 				columns = GridCells.Adaptive(120.dp),
-				contentPadding = PaddingValues(4.dp),
-				verticalArrangement = Arrangement.spacedBy(8.dp),
-				horizontalArrangement = Arrangement.spacedBy(8.dp),
+				contentPadding = PaddingValues(VideoMaxDimens.spacingXs),
+				verticalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingSm),
+				horizontalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingSm),
 				modifier = Modifier.fillMaxWidth()
 			) {
 				items(privateVideos, key = { it.id }) { video ->
@@ -464,7 +469,7 @@ private fun PrivateFolderContent(
 			dismissButton = {
 				TextButton(onClick = { showRemovePinDialog = false }) { Text("Cancelar") }
 			},
-			containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+			containerColor = MaterialTheme.colorScheme.surface
 		)
 	}
 }
@@ -478,8 +483,8 @@ private fun PrivateVideoCard(
 
 	Surface(
 		modifier = Modifier.fillMaxWidth(),
-		shape = RoundedCornerShape(8.dp),
-		color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+		shape = RoundedCornerShape(VideoMaxDimens.radiusSm),
+		color = MaterialTheme.colorScheme.surfaceContainerHigh
 	) {
 		Column {
 			Box {
@@ -494,7 +499,7 @@ private fun PrivateVideoCard(
 					modifier = Modifier
 						.fillMaxWidth()
 						.aspectRatio(16f / 9f)
-						.clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+						.clip(RoundedCornerShape(topStart = VideoMaxDimens.radiusSm, topEnd = VideoMaxDimens.radiusSm))
 				)
 				IconButton(
 					onClick = onRemove,
@@ -504,16 +509,17 @@ private fun PrivateVideoCard(
 						Icons.Default.Delete,
 						contentDescription = "Remover",
 						tint = MaterialTheme.colorScheme.error,
-						modifier = Modifier.size(18.dp)
+						modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
 					)
 				}
 			}
 			Text(
 				text = video.displayName,
 				style = MaterialTheme.typography.labelSmall,
+				color = VideoMaxTheme.extended.textPrimary,
 				maxLines = 1,
 				overflow = TextOverflow.Ellipsis,
-				modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+				modifier = Modifier.padding(horizontal = VideoMaxDimens.spacingXs, vertical = VideoMaxDimens.spacingXs)
 			)
 		}
 	}
@@ -542,7 +548,7 @@ private fun SetPinDialog(
 					singleLine = true,
 					modifier = Modifier.fillMaxWidth()
 				)
-				Spacer(modifier = Modifier.height(8.dp))
+				Spacer(modifier = Modifier.height(VideoMaxDimens.spacingSm))
 				OutlinedTextField(
 					value = confirmPin,
 					onValueChange = { if (it.length <= 4) confirmPin = it },
@@ -553,7 +559,7 @@ private fun SetPinDialog(
 					modifier = Modifier.fillMaxWidth()
 				)
 				if (error != null) {
-					Spacer(modifier = Modifier.height(4.dp))
+					Spacer(modifier = Modifier.height(VideoMaxDimens.spacingXs))
 					Text(text = error!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
 				}
 			}
@@ -570,7 +576,7 @@ private fun SetPinDialog(
 		dismissButton = {
 			TextButton(onClick = onDismiss) { Text("Cancelar") }
 		},
-		containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+		containerColor = MaterialTheme.colorScheme.surface
 	)
 }
 
@@ -591,13 +597,13 @@ private fun AddVideosDialog(
 		title = { Text("Agregar videos") },
 		text = {
 			if (videos.isEmpty()) {
-				Text("No hay videos disponibles")
+				Text("No hay videos disponibles", color = VideoMaxTheme.extended.textTertiary)
 			} else {
 				LazyVerticalGrid(
 					columns = GridCells.Adaptive(100.dp),
-					contentPadding = PaddingValues(4.dp),
-					verticalArrangement = Arrangement.spacedBy(4.dp),
-					horizontalArrangement = Arrangement.spacedBy(4.dp),
+					contentPadding = PaddingValues(VideoMaxDimens.spacingXs),
+					verticalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingXs),
+					horizontalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingXs),
 					modifier = Modifier.height(400.dp)
 				) {
 					items(videos, key = { it.id }) { video ->
@@ -606,9 +612,9 @@ private fun AddVideosDialog(
 							modifier = Modifier
 								.fillMaxWidth()
 								.clickable { if (!isPrivate) onAdd(video.id) },
-							shape = RoundedCornerShape(8.dp),
+							shape = RoundedCornerShape(VideoMaxDimens.radiusSm),
 							color = if (isPrivate) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-							else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+							else MaterialTheme.colorScheme.surfaceContainerHigh
 						) {
 							Column {
 								Box(contentAlignment = Alignment.Center) {
@@ -620,8 +626,8 @@ private fun AddVideosDialog(
 										modifier = Modifier
 											.fillMaxWidth()
 											.aspectRatio(16f / 9f)
-											.background(MaterialTheme.colorScheme.surfaceVariant)
-											.padding(4.dp)
+											.background(MaterialTheme.colorScheme.surfaceContainerHigh)
+											.padding(VideoMaxDimens.spacingXs)
 									)
 									if (isPrivate) {
 										Icon(
@@ -635,9 +641,10 @@ private fun AddVideosDialog(
 								Text(
 									text = video.displayName,
 									style = MaterialTheme.typography.labelSmall,
+									color = VideoMaxTheme.extended.textPrimary,
 									maxLines = 1,
 									overflow = TextOverflow.Ellipsis,
-									modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+									modifier = Modifier.padding(horizontal = VideoMaxDimens.spacingXs, vertical = VideoMaxDimens.spacingXs)
 								)
 							}
 						}
@@ -648,6 +655,6 @@ private fun AddVideosDialog(
 		confirmButton = {
 			TextButton(onClick = onDismiss) { Text("Listo") }
 		},
-		containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+		containerColor = MaterialTheme.colorScheme.surface
 	)
 }
