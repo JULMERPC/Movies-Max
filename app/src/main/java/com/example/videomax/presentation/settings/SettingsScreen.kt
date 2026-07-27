@@ -2,23 +2,27 @@ package com.example.videomax.presentation.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Gesture
+import androidx.compose.material.icons.filled.HideImage
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
@@ -27,7 +31,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -56,87 +59,21 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewModelScope
 import com.example.videomax.R
-import com.example.videomax.domain.model.AppSettings
 import com.example.videomax.domain.model.ThemeMode
-import com.example.videomax.domain.repository.SettingsRepository
-import com.example.videomax.domain.usecase.ObserveSettingsUseCase
 import com.example.videomax.util.Formatters
-import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
-import javax.inject.Inject
-
-@HiltViewModel
-class SettingsViewModel @Inject constructor(
-	observeSettings: ObserveSettingsUseCase,
-	private val settingsRepository: SettingsRepository
-) : ViewModel() {
-	val settings: StateFlow<AppSettings> = observeSettings()
-		.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppSettings())
-
-	fun setTheme(mode: ThemeMode) {
-		viewModelScope.launch { settingsRepository.setThemeMode(mode) }
-	}
-
-	fun setSpeed(speed: Float) {
-		viewModelScope.launch { settingsRepository.setDefaultPlaybackSpeed(speed) }
-	}
-
-	fun setRememberPosition(enabled: Boolean) {
-		viewModelScope.launch { settingsRepository.setRememberPlaybackPosition(enabled) }
-	}
-
-	fun setAutoPlayNext(enabled: Boolean) {
-		viewModelScope.launch { settingsRepository.setAutoPlayNext(enabled) }
-	}
-
-	fun setSeekStep(seconds: Int) {
-		viewModelScope.launch { settingsRepository.setSeekStepSeconds(seconds) }
-	}
-
-	fun setShowHiddenFiles(enabled: Boolean) {
-		viewModelScope.launch { settingsRepository.setShowHiddenFiles(enabled) }
-	}
-
-	fun setGesturesEnabled(enabled: Boolean) {
-		viewModelScope.launch { settingsRepository.setGesturesEnabled(enabled) }
-	}
-
-	fun setAutoPip(enabled: Boolean) {
-		viewModelScope.launch { settingsRepository.setAutoPip(enabled) }
-	}
-
-	fun addBlacklist(entry: String) {
-		viewModelScope.launch { settingsRepository.addBlacklistEntry(entry) }
-	}
-
-	fun removeBlacklist(entry: String) {
-		viewModelScope.launch { settingsRepository.removeBlacklistEntry(entry) }
-	}
-}
+import com.example.videomax.presentation.theme.screenGradient
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-	viewModel: SettingsViewModel = hiltViewModel()
+	viewModel: SettingsViewModel = hiltViewModel(),
+	onOpenPrivateFolder: () -> Unit = {}
 ) {
 	val settings by viewModel.settings.collectAsStateWithLifecycle()
-	var showBlacklistDialog by remember { mutableStateOf(false) }
-	var blacklistInput by remember { mutableStateOf("") }
 
-	val gradient = Brush.verticalGradient(
-		colors = listOf(
-			MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
-			MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f),
-			MaterialTheme.colorScheme.background
-		)
-	)
+	val gradient = screenGradient()
 
 	Scaffold(
 		containerColor = Color.Transparent,
@@ -223,47 +160,32 @@ fun SettingsScreen(
 					)
 				}
 
-				GlassSection(title = stringResource(R.string.settings_library), icon = Icons.Default.Visibility) {
+				GlassSection(title = "Archivos", icon = Icons.Default.Folder) {
 					GlassSwitchRow(
-						title = stringResource(R.string.settings_hidden_files),
-						subtitle = stringResource(R.string.settings_hidden_files_desc),
+						title = "Mostrar archivos .nomedia",
+						subtitle = "Incluir carpetas marcadas con .nomedia",
+						icon = Icons.Default.HideImage,
+						checked = settings.showNomedia,
+						onCheckedChange = viewModel::setShowNomedia
+					)
+					GlassSwitchRow(
+						title = "Mostrar archivos ocultos",
+						subtitle = "Incluir archivos y carpetas ocultos",
 						icon = Icons.Default.Visibility,
 						checked = settings.showHiddenFiles,
 						onCheckedChange = viewModel::setShowHiddenFiles
 					)
 				}
 
-				GlassSection(title = stringResource(R.string.settings_blacklist), icon = Icons.Default.Block) {
-					Text(
-						text = stringResource(R.string.settings_blacklist_desc),
-						style = MaterialTheme.typography.bodyMedium,
-						color = MaterialTheme.colorScheme.onSurfaceVariant
+				GlassSection(title = "Carpeta privada", icon = Icons.Default.Lock) {
+					GlassSwitchRow(
+						title = if (settings.privateFolderPin != null) "Carpeta privada activa" else "Configurar carpeta privada",
+						subtitle = if (settings.privateFolderPin != null) "${settings.privateVideoIds.size} videos protegidos" else "Proteger videos con PIN de 4 dígitos",
+						icon = Icons.Default.Lock,
+						checked = false,
+						isToggle = false,
+						onClick = onOpenPrivateFolder
 					)
-					Spacer(modifier = Modifier.height(8.dp))
-					TextButton(onClick = { showBlacklistDialog = true }) {
-						Icon(Icons.Default.Add, contentDescription = null)
-						Spacer(modifier = Modifier.padding(4.dp))
-						Text(stringResource(R.string.settings_blacklist_add))
-					}
-					if (settings.blacklist.isEmpty()) {
-						Text(
-							text = stringResource(R.string.settings_blacklist_empty),
-							style = MaterialTheme.typography.bodySmall,
-							color = MaterialTheme.colorScheme.onSurfaceVariant
-						)
-					} else {
-						settings.blacklist.forEach { entry ->
-							ListItem(
-								headlineContent = { Text(entry) },
-								trailingContent = {
-									IconButton(onClick = { viewModel.removeBlacklist(entry) }) {
-										Icon(Icons.Default.Close, contentDescription = stringResource(R.string.delete))
-									}
-								},
-								colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-							)
-						}
-					}
 				}
 
 				GlassSection(title = stringResource(R.string.settings_about)) {
@@ -278,37 +200,6 @@ fun SettingsScreen(
 				Spacer(modifier = Modifier.height(24.dp))
 			}
 		}
-	}
-
-	if (showBlacklistDialog) {
-		AlertDialog(
-			onDismissRequest = { showBlacklistDialog = false },
-			title = { Text(stringResource(R.string.settings_blacklist_add)) },
-			text = {
-				OutlinedTextField(
-					value = blacklistInput,
-					onValueChange = { blacklistInput = it },
-					label = { Text(stringResource(R.string.settings_blacklist_hint)) },
-					singleLine = true,
-					modifier = Modifier.fillMaxWidth()
-				)
-			},
-			confirmButton = {
-				TextButton(
-					onClick = {
-						viewModel.addBlacklist(blacklistInput)
-						blacklistInput = ""
-						showBlacklistDialog = false
-					}
-				) { Text(stringResource(R.string.add)) }
-			},
-			dismissButton = {
-				TextButton(onClick = { showBlacklistDialog = false }) {
-					Text(stringResource(R.string.cancel))
-				}
-			},
-			containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
-		)
 	}
 }
 
@@ -424,8 +315,10 @@ private fun GlassSwitchRow(
 	title: String,
 	subtitle: String? = null,
 	icon: ImageVector? = null,
-	checked: Boolean,
-	onCheckedChange: (Boolean) -> Unit
+	checked: Boolean = false,
+	isToggle: Boolean = true,
+	onCheckedChange: ((Boolean) -> Unit)? = null,
+	onClick: (() -> Unit)? = null
 ) {
 	ListItem(
 		headlineContent = { Text(title) },
@@ -436,8 +329,20 @@ private fun GlassSwitchRow(
 			}
 		},
 		trailingContent = {
-			Switch(checked = checked, onCheckedChange = onCheckedChange)
+			if (isToggle) {
+				Switch(checked = checked, onCheckedChange = onCheckedChange ?: {})
+			} else if (onClick != null) {
+				Icon(
+					imageVector = Icons.Default.Visibility,
+					contentDescription = null,
+					tint = MaterialTheme.colorScheme.onSurfaceVariant,
+					modifier = Modifier
+						.size(20.dp)
+						.clickable { onClick() }
+				)
+			}
 		},
+		modifier = if (!isToggle && onClick != null) Modifier.clickable { onClick() } else Modifier,
 		colors = ListItemDefaults.colors(containerColor = Color.Transparent)
 	)
 }

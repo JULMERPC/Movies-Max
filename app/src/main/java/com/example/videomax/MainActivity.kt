@@ -101,10 +101,4 @@ class MainActivity : ComponentActivity() {
 		}
 	}
 
-	override fun onPictureInPictureModeChanged(
-		isInPictureInPictureMode: Boolean,
-		newConfig: android.content.res.Configuration
-	) {
-		super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
-	}
 }

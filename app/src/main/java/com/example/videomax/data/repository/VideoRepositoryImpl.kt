@@ -23,11 +23,17 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import com.example.videomax.data.local.db.FtsQuery
+import android.content.ContentValues
+import android.content.Context
+import android.net.Uri
+import android.provider.MediaStore
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class VideoRepositoryImpl @Inject constructor(
+	@param:ApplicationContext private val context: Context,
 	private val videoDao: VideoDao,
 	private val scanner: MediaStoreVideoScanner,
 	private val settingsRepository: SettingsRepository
@@ -264,6 +270,9 @@ class VideoRepositoryImpl @Inject constructor(
 		var receivedAny = false
 		var keptAny = false
 
+		val nomediaDirs = if (!settings.showNomedia) collectNomediaDirs() else emptySet()
+		val privateIds = settings.privateVideoIds.toSet()
+
 		videoDao.clearScanKeepIds()
 
 		scanner.scanBatches(BATCH_SIZE).collect { batch ->
@@ -279,7 +288,8 @@ class VideoRepositoryImpl @Inject constructor(
 
 			val merged = batch.videos.mapNotNull { fresh ->
 				if (!settings.showHiddenFiles && isHidden(fresh)) return@mapNotNull null
-				if (isBlacklisted(fresh, settings.blacklist)) return@mapNotNull null
+				if (fresh.id in privateIds) return@mapNotNull null
+				if (nomediaDirs.isNotEmpty() && isInNomediaDir(fresh, nomediaDirs)) return@mapNotNull null
 				val state = userState[fresh.id]
 				if (state != null) {
 					fresh.copy(
@@ -323,6 +333,37 @@ class VideoRepositoryImpl @Inject constructor(
 		indexed
 	}
 
+	/**
+	 * Collects all directories that contain a .nomedia file.
+	 * Scans common media directories once, caches results.
+	 */
+	private fun collectNomediaDirs(): Set<String> {
+		val dirs = mutableSetOf<String>()
+		val roots = listOf(
+			android.os.Environment.getExternalStoragePublicDirectory(null),
+			android.os.Environment.getExternalStorageDirectory()
+		)
+		for (root in roots) {
+			if (!root.isDirectory) continue
+			root.walkTopDown()
+				.maxDepth(6)
+				.filter { it.isDirectory && it.name.startsWith(".") }
+				.forEach { dir ->
+					if (dir.listFiles()?.any { it.name.equals(".nomedia", ignoreCase = true) } == true) {
+						dirs.add(dir.absolutePath.lowercase())
+					}
+				}
+		}
+		return dirs
+	}
+
+	private fun isInNomediaDir(video: VideoEntity, nomediaDirs: Set<String>): Boolean {
+		val path = video.path?.lowercase() ?: return false
+		return nomediaDirs.any { nomediaDir ->
+			path.startsWith(nomediaDir)
+		}
+	}
+
 	override suspend fun updateFavorite(videoId: Long, isFavorite: Boolean) {
 		videoDao.updateFavorite(videoId, isFavorite)
 	}
@@ -339,21 +380,33 @@ class VideoRepositoryImpl @Inject constructor(
 		videoDao.updateIsNew(videoId, isNew = false)
 	}
 
+	override suspend fun deleteVideo(videoId: Long) = withContext(Dispatchers.IO) {
+		val video = videoDao.getById(videoId) ?: return@withContext
+		val uri = Uri.parse(video.uri)
+		try {
+			context.contentResolver.delete(uri, null, null)
+		} catch (_: Exception) { }
+		videoDao.deleteByIds(listOf(videoId))
+	}
+
+	override suspend fun renameVideo(videoId: Long, newName: String) = withContext(Dispatchers.IO) {
+		val video = videoDao.getById(videoId) ?: return@withContext
+		val uri = Uri.parse(video.uri)
+		val values = ContentValues().apply {
+			put(MediaStore.Video.Media.DISPLAY_NAME, newName)
+		}
+		try {
+			context.contentResolver.update(uri, values, null, null)
+		} catch (_: Exception) { }
+		videoDao.updateDisplayName(videoId, newName)
+	}
+
 	/** Path-based only — avoids per-file filesystem I/O during scan. */
 	private fun isHidden(video: VideoEntity): Boolean {
 		if (video.displayName.startsWith(".")) return true
 		val path = video.path ?: return false
 		return path.split('/', '\\').any { segment ->
 			segment.isNotEmpty() && segment.startsWith(".")
-		}
-	}
-
-	private fun isBlacklisted(video: VideoEntity, blacklist: List<String>): Boolean {
-		if (blacklist.isEmpty()) return false
-		return blacklist.any { entry ->
-			video.displayName.contains(entry, ignoreCase = true) ||
-				video.folderName.contains(entry, ignoreCase = true) ||
-				video.path?.contains(entry, ignoreCase = true) == true
 		}
 	}
 

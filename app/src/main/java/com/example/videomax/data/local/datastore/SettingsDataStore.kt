@@ -35,10 +35,12 @@ class SettingsDataStore @Inject constructor(
 		val autoPlayNext = booleanPreferencesKey("auto_play_next")
 		val seekStep = intPreferencesKey("seek_step_seconds")
 		val showHiddenFiles = booleanPreferencesKey("show_hidden_files")
+		val showNomedia = booleanPreferencesKey("show_nomedia")
 		val gesturesEnabled = booleanPreferencesKey("gestures_enabled")
 		val autoPip = booleanPreferencesKey("auto_pip")
-		val blacklist = stringPreferencesKey("blacklist")
 		val lastScanTimestamp = longPreferencesKey("last_scan_timestamp")
+		val privateFolderPin = stringPreferencesKey("private_folder_pin")
+		val privateVideoIds = stringPreferencesKey("private_video_ids")
 	}
 
 	val settings: Flow<AppSettings> = context.settingsDataStore.data.map { prefs ->
@@ -54,10 +56,12 @@ class SettingsDataStore @Inject constructor(
 			autoPlayNext = prefs[Keys.autoPlayNext] ?: false,
 			seekStepSeconds = prefs[Keys.seekStep] ?: 10,
 			showHiddenFiles = prefs[Keys.showHiddenFiles] ?: false,
+			showNomedia = prefs[Keys.showNomedia] ?: false,
 			gesturesEnabled = prefs[Keys.gesturesEnabled] ?: true,
 			autoPip = prefs[Keys.autoPip] ?: false,
-			blacklist = decodeBlacklist(prefs[Keys.blacklist]),
-			lastScanTimestamp = prefs[Keys.lastScanTimestamp] ?: 0L
+			lastScanTimestamp = prefs[Keys.lastScanTimestamp] ?: 0L,
+			privateFolderPin = prefs[Keys.privateFolderPin],
+			privateVideoIds = decodeLongList(prefs[Keys.privateVideoIds])
 		)
 	}
 
@@ -97,48 +101,37 @@ class SettingsDataStore @Inject constructor(
 		context.settingsDataStore.edit { it[Keys.autoPip] = enabled }
 	}
 
-	suspend fun setBlacklist(entries: List<String>) {
-		context.settingsDataStore.edit {
-			it[Keys.blacklist] = encodeBlacklist(entries)
-		}
-	}
-
 	suspend fun setLastScanTimestamp(timestamp: Long) {
 		context.settingsDataStore.edit {
 			it[Keys.lastScanTimestamp] = timestamp
 		}
 	}
 
-	suspend fun addBlacklistEntry(entry: String) {
-		val clean = entry.trim()
-		if (clean.isEmpty()) return
-		context.settingsDataStore.edit { prefs ->
-			val current = decodeBlacklist(prefs[Keys.blacklist]).toMutableList()
-			if (current.none { it.equals(clean, ignoreCase = true) }) {
-				current += clean
-			}
-			prefs[Keys.blacklist] = encodeBlacklist(current)
+	suspend fun setShowNomedia(enabled: Boolean) {
+		context.settingsDataStore.edit { it[Keys.showNomedia] = enabled }
+	}
+
+	suspend fun setPrivateFolderPin(pin: String?) {
+		context.settingsDataStore.edit {
+			if (pin == null) it.remove(Keys.privateFolderPin)
+			else it[Keys.privateFolderPin] = pin
 		}
 	}
 
-	suspend fun removeBlacklistEntry(entry: String) {
-		context.settingsDataStore.edit { prefs ->
-			val current = decodeBlacklist(prefs[Keys.blacklist])
-				.filterNot { it.equals(entry, ignoreCase = true) }
-			prefs[Keys.blacklist] = encodeBlacklist(current)
+	suspend fun setPrivateVideoIds(ids: List<Long>) {
+		context.settingsDataStore.edit {
+			it[Keys.privateVideoIds] = encodeLongList(ids)
 		}
 	}
 
-	private fun encodeBlacklist(entries: List<String>): String =
-		org.json.JSONArray(entries.map { it.trim() }).toString()
+	private fun encodeLongList(ids: List<Long>): String =
+		org.json.JSONArray(ids.map { it }).toString()
 
-	private fun decodeBlacklist(raw: String?): List<String> {
+	private fun decodeLongList(raw: String?): List<Long> {
 		if (raw.isNullOrBlank()) return emptyList()
 		return runCatching {
 			org.json.JSONArray(raw).let { arr ->
-				(0 until arr.length())
-					.mapNotNull { arr.optString(it, "").trim() }
-					.filter { it.isNotEmpty() }
+				(0 until arr.length()).map { arr.getLong(it) }
 			}
 		}.getOrDefault(emptyList())
 	}

@@ -80,7 +80,7 @@ fun HistoryScreen(
 				actions = {
 					if (history.isNotEmpty()) {
 						IconButton(onClick = viewModel::clear) {
-							Icon(Icons.Default.DeleteSweep, contentDescription = "Clear history")
+							Icon(Icons.Default.DeleteSweep, contentDescription = "Limpiar historial")
 						}
 					}
 				}

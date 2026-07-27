@@ -1,5 +1,11 @@
 package com.example.videomax.presentation.library
 
+import android.app.Application
+import android.database.ContentObserver
+import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.provider.MediaStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
@@ -15,6 +21,7 @@ import com.example.videomax.domain.usecase.ToggleFavoriteUseCase
 import com.example.videomax.presentation.player.PlaybackQueue
 import com.example.videomax.presentation.player.PlaybackQueueContext
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,10 +30,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 enum class LibraryFilterMode {
@@ -52,6 +61,7 @@ data class LibraryUiState(
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
+	private val application: Application,
 	private val pagingVideos: PagingVideosUseCase,
 	private val scanVideos: ScanVideosUseCase,
 	private val toggleFavorite: ToggleFavoriteUseCase,
@@ -70,6 +80,15 @@ class LibraryViewModel @Inject constructor(
 	private val filterMode = MutableStateFlow(LibraryFilterMode.ALL_VIDEOS)
 	private val isSearchOpen = MutableStateFlow(false)
 	private val message = MutableStateFlow<String?>(null)
+	private val hasAutoScanned = MutableStateFlow(false)
+
+	private val mediaStoreObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+		override fun onChange(selfChange: Boolean, uri: Uri?) {
+			if (!isScanning.value && hasAutoScanned.value) {
+				checkForNewVideos()
+			}
+		}
+	}
 
 	@OptIn(kotlinx.coroutines.FlowPreview::class)
 	private val debouncedQuery = query
@@ -128,7 +147,22 @@ class LibraryViewModel @Inject constructor(
 				sortOption.value = settings.sortOption
 			}
 		}
-		refresh()
+
+		val videoCollection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+		application.contentResolver.registerContentObserver(
+			videoCollection,
+			true,
+			mediaStoreObserver
+		)
+
+		viewModelScope.launch {
+			val dbCount = withContext(Dispatchers.IO) { videoRepository.observeVideoCount().first() }
+			if (dbCount > 0) {
+				hasAutoScanned.value = true
+			} else {
+				refresh()
+			}
+		}
 	}
 
 	fun onQueryChange(value: String) {
@@ -175,10 +209,34 @@ class LibraryViewModel @Inject constructor(
 					}
 				}
 			}
-				.onSuccess { count -> message.value = "Indexed $count videos" }
-				.onFailure { message.value = it.message ?: "Scan failed" }
+				.onSuccess { count -> message.value = "Indexados $count videos" }
+				.onFailure { message.value = it.message ?: "Error al escanear" }
+			hasAutoScanned.value = true
 			isScanning.value = false
 			scanProgress.value = 1f
+		}
+	}
+
+	private fun checkForNewVideos() {
+		viewModelScope.launch {
+			val mediaStoreCount = withContext(Dispatchers.IO) {
+				val collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+				var count = 0
+				application.contentResolver.query(
+					collection,
+					arrayOf(MediaStore.Video.Media._ID),
+					null,
+					null,
+					null
+				)?.use { cursor ->
+					count = cursor.count
+				}
+				count
+			}
+			val dbCount = withContext(Dispatchers.IO) { videoRepository.observeVideoCount().first() }
+			if (mediaStoreCount > dbCount) {
+				refresh()
+			}
 		}
 	}
 
@@ -198,8 +256,47 @@ class LibraryViewModel @Inject constructor(
 		viewModelScope.launch {
 			val id = playlistRepository.createPlaylist(name)
 			if (videoId != null) playlistRepository.addVideoToPlaylist(id, videoId)
-			message.value = "Playlist created"
+			message.value = "Lista creada"
 		}
+	}
+
+	fun deleteVideo(videoId: Long) {
+		viewModelScope.launch {
+			videoRepository.deleteVideo(videoId)
+			message.value = "Video eliminado"
+		}
+	}
+
+	fun renameVideo(videoId: Long, newName: String) {
+		viewModelScope.launch {
+			videoRepository.renameVideo(videoId, newName)
+			message.value = "Renombrado"
+		}
+	}
+
+	fun moveToPrivate(videoId: Long) {
+		viewModelScope.launch {
+			val settings = settingsRepository.settings.first()
+			val current = settings.privateVideoIds
+			if (videoId !in current) {
+				settingsRepository.setPrivateVideoIds(current + videoId)
+				message.value = "Movido a carpeta privada"
+			}
+		}
+	}
+
+	fun addToPlaylist(playlistId: Long, videoId: Long) {
+		viewModelScope.launch {
+			playlistRepository.addVideoToPlaylist(playlistId, videoId)
+			message.value = "Agregado a la lista"
+		}
+	}
+
+	val playlists = playlistRepository.observePlaylists()
+		.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+	suspend fun getVideoById(videoId: Long): Video? = withContext(Dispatchers.IO) {
+		videoRepository.getVideoById(videoId)
 	}
 
 	suspend fun preparePlayback(videoId: Long) {
@@ -233,5 +330,10 @@ class LibraryViewModel @Inject constructor(
 
 	private companion object {
 		const val SEARCH_DEBOUNCE_MS = 300L
+	}
+
+	override fun onCleared() {
+		super.onCleared()
+		application.contentResolver.unregisterContentObserver(mediaStoreObserver)
 	}
 }

@@ -197,9 +197,14 @@ internal fun PlayerSideActions(
 	isMuted: Boolean,
 	isFavorite: Boolean,
 	isOrientationLocked: Boolean,
+	isAutoPip: Boolean,
+	playbackSpeed: Float,
 	onCycleOrientation: () -> Unit,
 	onToggleMute: () -> Unit,
 	onScreenshot: () -> Unit,
+	onToggleAutoPip: () -> Unit,
+	onCycleSpeed: () -> Unit,
+	onOpenSettings: () -> Unit,
 	onToggleFavorite: () -> Unit,
 	modifier: Modifier = Modifier
 ) {
@@ -233,6 +238,30 @@ internal fun PlayerSideActions(
 		}
 		RippleIconButton(onClick = onScreenshot) {
 			Icon(Icons.Default.Camera, "Captura", tint = Color.White, modifier = Modifier.size(20.dp))
+		}
+		RippleIconButton(onClick = onToggleAutoPip) {
+			Icon(
+				Icons.Default.PictureInPicture,
+				contentDescription = "PiP",
+				tint = if (isAutoPip) MaterialTheme.colorScheme.primary else Color.White,
+				modifier = Modifier.size(20.dp)
+			)
+		}
+		RippleIconButton(onClick = onCycleSpeed) {
+			Icon(
+				Icons.Default.Speed,
+				contentDescription = "Velocidad",
+				tint = Color.White,
+				modifier = Modifier.size(20.dp)
+			)
+		}
+		RippleIconButton(onClick = onOpenSettings) {
+			Icon(
+				Icons.Default.Settings,
+				contentDescription = "Ajustes del video",
+				tint = Color.White,
+				modifier = Modifier.size(20.dp)
+			)
 		}
 		RippleIconButton(onClick = onToggleFavorite) {
 			Icon(
@@ -374,52 +403,4 @@ internal fun RippleIconButton(
 	}
 }
 
-@Composable
-internal fun PlayerOptionsRow(
-	isAutoPip: Boolean,
-	playbackSpeed: Float,
-	onToggleAutoPip: () -> Unit,
-	onCycleSpeed: () -> Unit,
-	onOpenSettings: () -> Unit
-) {
-	Row(
-		modifier = Modifier
-			.fillMaxWidth()
-			.padding(horizontal = 14.dp, vertical = 2.dp),
-		horizontalArrangement = Arrangement.SpaceBetween,
-		verticalAlignment = Alignment.CenterVertically
-	) {
-		RippleIconButton(onClick = onToggleAutoPip) {
-			Icon(
-				Icons.Default.PictureInPicture,
-				contentDescription = "PiP",
-				tint = if (isAutoPip) MaterialTheme.colorScheme.primary else Color.White,
-				modifier = Modifier.size(20.dp)
-			)
-		}
 
-		RippleIconButton(onClick = onCycleSpeed) {
-			Icon(
-				Icons.Default.Speed,
-				contentDescription = "Velocidad",
-				tint = Color.White,
-				modifier = Modifier.size(20.dp)
-			)
-		}
-
-		Text(
-			text = if (playbackSpeed == 1f) "1x" else "${playbackSpeed}x",
-			color = if (playbackSpeed == 1f) Color.White.copy(alpha = 0.6f) else MaterialTheme.colorScheme.primary,
-			style = MaterialTheme.typography.labelSmall
-		)
-
-		RippleIconButton(onClick = onOpenSettings) {
-			Icon(
-				Icons.Default.Settings,
-				contentDescription = "Ajustes del video",
-				tint = Color.White,
-				modifier = Modifier.size(20.dp)
-			)
-		}
-	}
-}

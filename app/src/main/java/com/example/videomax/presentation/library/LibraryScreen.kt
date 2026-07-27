@@ -1,5 +1,7 @@
 package com.example.videomax.presentation.library
 
+import android.content.Intent
+import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -33,8 +35,10 @@ import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.VideoFile
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,11 +47,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
@@ -61,14 +67,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
@@ -77,6 +80,8 @@ import com.example.videomax.domain.model.Video
 import com.example.videomax.presentation.components.EmptyState
 import com.example.videomax.presentation.components.VideoGridItem
 import com.example.videomax.presentation.components.VideoListItem
+import com.example.videomax.presentation.components.VideoMenuAction
+import com.example.videomax.presentation.theme.screenGradient
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -90,10 +95,14 @@ fun LibraryScreen(
 	val pagingItems = viewModel.videos.collectAsLazyPagingItems()
 	val snackbarHostState = remember { SnackbarHostState() }
 	val scope = rememberCoroutineScope()
+	val context = LocalContext.current
+	val playlists by viewModel.playlists.collectAsStateWithLifecycle()
 
-	LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-		viewModel.refresh()
-	}
+	var renameVideoId by remember { mutableStateOf<Long?>(null) }
+	var renameText by remember { mutableStateOf("") }
+	var deleteVideoId by remember { mutableStateOf<Long?>(null) }
+	var deleteVideoName by remember { mutableStateOf("") }
+	var playlistTargetVideoId by remember { mutableStateOf<Long?>(null) }
 
 	LaunchedEffect(state.message) {
 		state.message?.let {
@@ -102,13 +111,54 @@ fun LibraryScreen(
 		}
 	}
 
-	val gradient = Brush.verticalGradient(
-		colors = listOf(
-			MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
-			MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f),
-			MaterialTheme.colorScheme.background
-		)
-	)
+	val onMenuAction: (VideoMenuAction) -> Unit = { action ->
+		when (action) {
+			is VideoMenuAction.MoveToPrivate -> viewModel.moveToPrivate(action.videoId)
+			is VideoMenuAction.PlayBackground -> {
+				viewModel.markVideoSeen(action.videoId)
+				scope.launch {
+					val video = viewModel.getVideoById(action.videoId)
+					if (video != null) {
+						val serviceIntent = Intent(context, com.example.videomax.service.BackgroundAudioService::class.java).apply {
+							putExtra(com.example.videomax.service.BackgroundAudioService.EXTRA_VIDEO_URI, video.uri)
+							putExtra(com.example.videomax.service.BackgroundAudioService.EXTRA_VIDEO_NAME, video.displayName)
+						}
+						if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+							context.startForegroundService(serviceIntent)
+						} else {
+							context.startService(serviceIntent)
+						}
+					}
+				}
+			}
+			is VideoMenuAction.AddToPlaylist -> {
+				playlistTargetVideoId = action.videoId
+			}
+			is VideoMenuAction.Rename -> {
+				renameVideoId = action.videoId
+				renameText = ""
+			}
+			is VideoMenuAction.Share -> {
+				scope.launch {
+					val video = viewModel.getVideoById(action.videoId)
+					if (video != null) {
+						val shareIntent = Intent(Intent.ACTION_SEND).apply {
+							type = "video/*"
+							putExtra(Intent.EXTRA_STREAM, android.net.Uri.parse(video.uri))
+							addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+						}
+						context.startActivity(Intent.createChooser(shareIntent, "Compartir video"))
+					}
+				}
+			}
+			is VideoMenuAction.Delete -> {
+				deleteVideoId = action.videoId
+				deleteVideoName = ""
+			}
+		}
+	}
+
+	val gradient = screenGradient()
 
 	Scaffold(
 		containerColor = Color.Transparent,
@@ -118,6 +168,8 @@ fun LibraryScreen(
 				isGridProvider = { state.isGrid },
 				isSearchOpenProvider = { state.isSearchOpen },
 				queryProvider = { state.query },
+				isScanningProvider = { state.isScanning },
+				onRefresh = viewModel::refresh,
 				onToggleLayout = viewModel::toggleLayout,
 				onSortSelected = viewModel::onSortSelected,
 				onToggleSearch = viewModel::toggleSearch,
@@ -147,19 +199,20 @@ fun LibraryScreen(
 
 				when (state.filterMode) {
 					LibraryFilterMode.ALL_VIDEOS -> {
-						VideoContent(
-							pagingItems = pagingItems,
-							isGridProvider = { state.isGrid },
-							isScanningProvider = { state.isScanning },
-							onVideoClick = { videoId ->
-								scope.launch {
-									viewModel.markVideoSeen(videoId)
-									viewModel.preparePlayback(videoId)
-									onOpenPlayer(videoId)
-								}
-							},
-							onFavoriteClick = viewModel::onFavorite
-						)
+					VideoContent(
+						pagingItems = pagingItems,
+						isGridProvider = { state.isGrid },
+						isScanningProvider = { state.isScanning },
+						onVideoClick = { videoId ->
+							scope.launch {
+								viewModel.markVideoSeen(videoId)
+								viewModel.preparePlayback(videoId)
+								onOpenPlayer(videoId)
+							}
+						},
+						onFavoriteClick = viewModel::onFavorite,
+						onMenuAction = onMenuAction
+					)
 					}
 					LibraryFilterMode.ALL_FOLDERS -> {
 						FolderGrid(
@@ -183,6 +236,107 @@ fun LibraryScreen(
 			}
 		}
 	}
+
+	if (renameVideoId != null) {
+		LaunchedEffect(renameVideoId) {
+			if (renameText.isEmpty()) {
+				val video = viewModel.getVideoById(renameVideoId!!)
+				renameText = video?.displayName ?: ""
+			}
+		}
+		AlertDialog(
+			onDismissRequest = { renameVideoId = null },
+			title = { Text("Renombrar") },
+			text = {
+				OutlinedTextField(
+					value = renameText,
+					onValueChange = { renameText = it },
+					label = { Text("Nombre") },
+					singleLine = true,
+					modifier = Modifier.fillMaxWidth()
+				)
+			},
+			confirmButton = {
+				TextButton(onClick = {
+					if (renameText.isNotBlank()) {
+						viewModel.renameVideo(renameVideoId!!, renameText.trim())
+					}
+					renameVideoId = null
+				}) { Text("Guardar") }
+			},
+			dismissButton = {
+				TextButton(onClick = { renameVideoId = null }) { Text("Cancelar") }
+			},
+			containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+		)
+	}
+
+	if (deleteVideoId != null) {
+		LaunchedEffect(deleteVideoId) {
+			if (deleteVideoName.isEmpty()) {
+				val video = viewModel.getVideoById(deleteVideoId!!)
+				deleteVideoName = video?.displayName ?: ""
+			}
+		}
+		AlertDialog(
+			onDismissRequest = { deleteVideoId = null },
+			title = { Text("Eliminar video") },
+			text = { Text("¿Eliminar \"${deleteVideoName}\"? Esta acción no se puede deshacer.") },
+			confirmButton = {
+				TextButton(onClick = {
+					viewModel.deleteVideo(deleteVideoId!!)
+					deleteVideoId = null
+				}) { Text("Eliminar", color = MaterialTheme.colorScheme.error) }
+			},
+			dismissButton = {
+				TextButton(onClick = { deleteVideoId = null }) { Text("Cancelar") }
+			},
+			containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+		)
+	}
+
+	if (playlistTargetVideoId != null) {
+		AlertDialog(
+			onDismissRequest = { playlistTargetVideoId = null },
+			title = { Text("Añadir a lista") },
+			text = {
+				if (playlists.isEmpty()) {
+					Text("No hay listas. Creá una desde la pestaña Playlists.")
+				} else {
+					Column {
+						playlists.forEach { playlist ->
+							Row(
+								modifier = Modifier
+									.fillMaxWidth()
+									.clickable {
+										viewModel.addToPlaylist(playlist.id, playlistTargetVideoId!!)
+										playlistTargetVideoId = null
+									}
+									.padding(vertical = 12.dp, horizontal = 4.dp),
+								verticalAlignment = Alignment.CenterVertically
+							) {
+								Icon(
+									imageVector = Icons.Default.Folder,
+									contentDescription = null,
+									tint = MaterialTheme.colorScheme.primary,
+									modifier = Modifier.size(24.dp)
+								)
+								Spacer(modifier = Modifier.width(12.dp))
+								Text(
+									text = playlist.name,
+									style = MaterialTheme.typography.bodyLarge
+								)
+							}
+						}
+					}
+				}
+			},
+			confirmButton = {
+				TextButton(onClick = { playlistTargetVideoId = null }) { Text("Cancelar") }
+			},
+			containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+		)
+	}
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -192,6 +346,8 @@ fun LibraryTopBar(
 	isGridProvider: () -> Boolean,
 	isSearchOpenProvider: () -> Boolean,
 	queryProvider: () -> String,
+	isScanningProvider: () -> Boolean,
+	onRefresh: () -> Unit,
 	onToggleLayout: () -> Unit,
 	onSortSelected: (SortOption) -> Unit,
 	onToggleSearch: () -> Unit,
@@ -202,6 +358,7 @@ fun LibraryTopBar(
 	val isGrid = isGridProvider()
 	val isSearchOpen = isSearchOpenProvider()
 	val query = queryProvider()
+	val isScanning = isScanningProvider()
 
 	Column {
 		TopAppBar(
@@ -216,10 +373,16 @@ fun LibraryTopBar(
 				}
 			},
 		actions = {
+			IconButton(onClick = onRefresh, enabled = !isScanning) {
+				Icon(
+					if (isScanning) Icons.Default.Refresh else Icons.Default.Refresh,
+					contentDescription = "Escanear"
+				)
+			}
 			IconButton(onClick = onToggleLayout) {
 					Icon(
 						if (isGrid) Icons.AutoMirrored.Filled.ViewList else Icons.Default.GridView,
-						contentDescription = "Toggle layout"
+						contentDescription = "Cambiar vista"
 					)
 				}
 				IconButton(onClick = onToggleSearch) {
@@ -510,7 +673,8 @@ fun VideoContent(
 	isGridProvider: () -> Boolean,
 	isScanningProvider: () -> Boolean,
 	onVideoClick: (Long) -> Unit,
-	onFavoriteClick: (Long) -> Unit
+	onFavoriteClick: (Long) -> Unit,
+	onMenuAction: ((com.example.videomax.presentation.components.VideoMenuAction) -> Unit)? = null
 ) {
 	val isGrid = isGridProvider()
 	val isScanning = isScanningProvider()
@@ -542,12 +706,13 @@ fun VideoContent(
 						if (video == null) {
 							VideoGridSkeleton()
 						} else {
-							VideoGridItem(
-								video = video,
-								onClick = { onVideoClick(video.id) },
-								onFavoriteClick = { onFavoriteClick(video.id) },
-								showOnlyThumbnail = false
-							)
+						VideoGridItem(
+							video = video,
+							onClick = { onVideoClick(video.id) },
+							onFavoriteClick = { onFavoriteClick(video.id) },
+							onMenuAction = onMenuAction,
+							showOnlyThumbnail = false
+						)
 						}
 					}
 				}
@@ -564,11 +729,12 @@ fun VideoContent(
 						if (video == null) {
 							VideoListSkeleton()
 						} else {
-							VideoListItem(
-								video = video,
-								onClick = { onVideoClick(video.id) },
-								onFavoriteClick = { onFavoriteClick(video.id) }
-							)
+						VideoListItem(
+							video = video,
+							onClick = { onVideoClick(video.id) },
+							onFavoriteClick = { onFavoriteClick(video.id) },
+							onMenuAction = onMenuAction
+						)
 						}
 					}
 				}

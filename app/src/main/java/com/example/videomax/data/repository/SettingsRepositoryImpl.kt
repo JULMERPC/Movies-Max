@@ -32,15 +32,15 @@ class SettingsRepositoryImpl @Inject constructor(
 
 	override suspend fun setShowHiddenFiles(enabled: Boolean) = dataStore.setShowHiddenFiles(enabled)
 
+	override suspend fun setShowNomedia(enabled: Boolean) = dataStore.setShowNomedia(enabled)
+
 	override suspend fun setGesturesEnabled(enabled: Boolean) = dataStore.setGesturesEnabled(enabled)
 
 	override suspend fun setAutoPip(enabled: Boolean) = dataStore.setAutoPip(enabled)
 
-	override suspend fun setBlacklist(entries: List<String>) = dataStore.setBlacklist(entries)
-
-	override suspend fun addBlacklistEntry(entry: String) = dataStore.addBlacklistEntry(entry)
-
-	override suspend fun removeBlacklistEntry(entry: String) = dataStore.removeBlacklistEntry(entry)
-
 	override suspend fun setLastScanTimestamp(timestamp: Long) = dataStore.setLastScanTimestamp(timestamp)
+
+	override suspend fun setPrivateFolderPin(pin: String?) = dataStore.setPrivateFolderPin(pin)
+
+	override suspend fun setPrivateVideoIds(ids: List<Long>) = dataStore.setPrivateVideoIds(ids)
 }

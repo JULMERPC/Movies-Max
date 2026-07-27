@@ -75,4 +75,6 @@ interface VideoRepository {
 	suspend fun updateLastPosition(videoId: Long, positionMs: Long)
 	suspend fun incrementPlayCount(videoId: Long)
 	suspend fun markVideoSeen(videoId: Long)
+	suspend fun deleteVideo(videoId: Long)
+	suspend fun renameVideo(videoId: Long, newName: String)
 }

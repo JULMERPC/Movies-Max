@@ -11,13 +11,6 @@ enum class SortOption {
 	SIZE_ASC
 }
 
-enum class VideoFilter {
-	ALL,
-	FAVORITES,
-	RECENT,
-	FOLDERS
-}
-
 enum class ThemeMode {
 	SYSTEM,
 	LIGHT,
@@ -32,10 +25,12 @@ data class AppSettings(
 	val autoPlayNext: Boolean = false,
 	val seekStepSeconds: Int = 10,
 	val showHiddenFiles: Boolean = false,
+	val showNomedia: Boolean = false,
 	val gesturesEnabled: Boolean = true,
 	val autoPip: Boolean = false,
-	val blacklist: List<String> = emptyList(),
-	val lastScanTimestamp: Long = 0L
+	val lastScanTimestamp: Long = 0L,
+	val privateFolderPin: String? = null,
+	val privateVideoIds: List<Long> = emptyList()
 )
 
 data class SubtitleTrack(

@@ -17,17 +17,29 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,10 +65,12 @@ fun VideoGridItem(
 	video: Video,
 	onClick: () -> Unit,
 	onFavoriteClick: () -> Unit,
-	onLongClick: (() -> Unit)? = null,
+	onMenuAction: ((VideoMenuAction) -> Unit)? = null,
 	showOnlyThumbnail: Boolean = false,
 	modifier: Modifier = Modifier
 ) {
+	var menuExpanded by remember { mutableStateOf(false) }
+
 	if (showOnlyThumbnail) {
 		Box(
 			modifier = modifier
@@ -149,15 +163,34 @@ fun VideoGridItem(
 					.background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
 					.padding(horizontal = 7.dp, vertical = 3.dp)
 			)
-			IconButton(
-				onClick = onFavoriteClick,
-				modifier = Modifier.align(Alignment.TopEnd)
+			Row(
+				modifier = Modifier
+					.align(Alignment.TopEnd)
+					.padding(2.dp),
+				horizontalArrangement = Arrangement.End
 			) {
-				Icon(
-					imageVector = if (video.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-					contentDescription = "Favorite",
-					tint = if (video.isFavorite) MaterialTheme.colorScheme.secondary else Color.White
-				)
+				IconButton(onClick = onFavoriteClick) {
+					Icon(
+						imageVector = if (video.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+						contentDescription = "Favorite",
+						tint = if (video.isFavorite) MaterialTheme.colorScheme.secondary else Color.White
+					)
+				}
+				if (onMenuAction != null) {
+					IconButton(onClick = { menuExpanded = true }) {
+						Icon(
+							imageVector = Icons.Default.MoreVert,
+							contentDescription = "Menu",
+							tint = Color.White
+						)
+					}
+					VideoContextMenu(
+						expanded = menuExpanded,
+						videoId = video.id,
+						onDismiss = { menuExpanded = false },
+						onAction = onMenuAction
+					)
+				}
 			}
 			if (video.lastPositionMs > 0 && video.durationMs > 0) {
 				LinearProgressIndicator(
@@ -203,8 +236,11 @@ fun VideoListItem(
 	video: Video,
 	onClick: () -> Unit,
 	onFavoriteClick: () -> Unit,
+	onMenuAction: ((VideoMenuAction) -> Unit)? = null,
 	modifier: Modifier = Modifier
 ) {
+	var menuExpanded by remember { mutableStateOf(false) }
+
 	Row(
 		modifier = modifier
 			.fillMaxWidth()
@@ -260,6 +296,21 @@ fun VideoListItem(
 				imageVector = if (video.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
 				contentDescription = "Favorite",
 				tint = if (video.isFavorite) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant
+			)
+		}
+		if (onMenuAction != null) {
+			IconButton(onClick = { menuExpanded = true }) {
+				Icon(
+					imageVector = Icons.Default.MoreVert,
+					contentDescription = "Menu",
+					tint = MaterialTheme.colorScheme.onSurfaceVariant
+				)
+			}
+			VideoContextMenu(
+				expanded = menuExpanded,
+				videoId = video.id,
+				onDismiss = { menuExpanded = false },
+				onAction = onMenuAction
 			)
 		}
 	}
@@ -342,6 +393,59 @@ fun EmptyState(
 			text = subtitle,
 			style = MaterialTheme.typography.bodyLarge,
 			color = MaterialTheme.colorScheme.onSurfaceVariant
+		)
+	}
+}
+
+sealed interface VideoMenuAction {
+	data class MoveToPrivate(val videoId: Long) : VideoMenuAction
+	data class PlayBackground(val videoId: Long) : VideoMenuAction
+	data class AddToPlaylist(val videoId: Long) : VideoMenuAction
+	data class Rename(val videoId: Long) : VideoMenuAction
+	data class Share(val videoId: Long) : VideoMenuAction
+	data class Delete(val videoId: Long) : VideoMenuAction
+}
+
+@Composable
+fun VideoContextMenu(
+	expanded: Boolean,
+	videoId: Long,
+	onDismiss: () -> Unit,
+	onAction: (VideoMenuAction) -> Unit
+) {
+	DropdownMenu(
+		expanded = expanded,
+		onDismissRequest = onDismiss
+	) {
+		DropdownMenuItem(
+			text = { Text("Mover a carpeta privada") },
+			onClick = { onAction(VideoMenuAction.MoveToPrivate(videoId)); onDismiss() },
+			leadingIcon = { Icon(Icons.Default.Visibility, contentDescription = null) }
+		)
+		DropdownMenuItem(
+			text = { Text("Reproducir solo audio en fondo") },
+			onClick = { onAction(VideoMenuAction.PlayBackground(videoId)); onDismiss() },
+			leadingIcon = { Icon(Icons.Default.Headphones, contentDescription = null) }
+		)
+		DropdownMenuItem(
+			text = { Text("Añadir a lista") },
+			onClick = { onAction(VideoMenuAction.AddToPlaylist(videoId)); onDismiss() },
+			leadingIcon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = null) }
+		)
+		DropdownMenuItem(
+			text = { Text("Renombrar") },
+			onClick = { onAction(VideoMenuAction.Rename(videoId)); onDismiss() },
+			leadingIcon = { Icon(Icons.Default.Create, contentDescription = null) }
+		)
+		DropdownMenuItem(
+			text = { Text("Compartir") },
+			onClick = { onAction(VideoMenuAction.Share(videoId)); onDismiss() },
+			leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) }
+		)
+		DropdownMenuItem(
+			text = { Text("Eliminar", color = MaterialTheme.colorScheme.error) },
+			onClick = { onAction(VideoMenuAction.Delete(videoId)); onDismiss() },
+			leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) }
 		)
 	}
 }

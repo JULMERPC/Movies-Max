@@ -332,6 +332,9 @@ interface VideoDao {
 	@Query("UPDATE videos SET isNew = :isNew WHERE id = :videoId")
 	suspend fun updateIsNew(videoId: Long, isNew: Boolean)
 
+	@Query("UPDATE videos SET displayName = :name WHERE id = :videoId")
+	suspend fun updateDisplayName(videoId: Long, name: String)
+
 	@Query("SELECT COUNT(*) FROM videos")
 	fun observeCount(): Flow<Int>
 

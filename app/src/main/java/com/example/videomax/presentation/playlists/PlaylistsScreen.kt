@@ -51,157 +51,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.SavedStateHandle
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewModelScope
 import com.example.videomax.domain.model.PlaybackHistory
-import com.example.videomax.domain.model.Playlist
-import com.example.videomax.domain.model.PlaylistWithVideos
 import com.example.videomax.domain.model.Video
-import com.example.videomax.domain.repository.HistoryRepository
-import com.example.videomax.domain.repository.PlaylistRepository
-import com.example.videomax.domain.repository.VideoRepository
-import com.example.videomax.domain.usecase.CreatePlaylistUseCase
-import com.example.videomax.domain.usecase.GetVideoByIdUseCase
-import com.example.videomax.domain.usecase.ObserveFavoritesUseCase
-import com.example.videomax.domain.usecase.ObserveHistoryUseCase
-import com.example.videomax.domain.usecase.ObservePlaylistsUseCase
-import com.example.videomax.domain.usecase.ToggleFavoriteUseCase
 import com.example.videomax.presentation.components.EmptyState
 import com.example.videomax.presentation.components.VideoGridItem
 import com.example.videomax.presentation.components.VideoThumbnail
 import com.example.videomax.presentation.navigation.Screen
-import com.example.videomax.presentation.player.PlaybackQueue
+import com.example.videomax.presentation.theme.screenGradient
 import com.example.videomax.util.Formatters
-import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
-import javax.inject.Inject
-
-data class SmartCategory(
-	val type: String,
-	val title: String,
-	val subtitle: String,
-	val icon: ImageVector
-)
-
-@HiltViewModel
-class PlaylistsViewModel @Inject constructor(
-	observePlaylists: ObservePlaylistsUseCase,
-	private val createPlaylist: CreatePlaylistUseCase,
-	private val playlistRepository: PlaylistRepository,
-	observeFavorites: ObserveFavoritesUseCase,
-	observeHistory: ObserveHistoryUseCase,
-	videoRepository: VideoRepository
-) : ViewModel() {
-	val playlists: StateFlow<List<Playlist>> = observePlaylists()
-		.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-	val favoritesCount: StateFlow<Int> = observeFavorites()
-		.map { it.size }
-		.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
-
-	val historyCount: StateFlow<Int> = observeHistory()
-		.map { it.size }
-		.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
-
-	val mostPlayedCount: StateFlow<Int> = videoRepository.observeMostPlayed(200)
-		.map { it.size }
-		.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
-
-	fun create(name: String) {
-		viewModelScope.launch { createPlaylist(name) }
-	}
-
-	fun delete(id: Long) {
-		viewModelScope.launch { playlistRepository.deletePlaylist(id) }
-	}
-}
-
-@HiltViewModel
-class PlaylistDetailViewModel @Inject constructor(
-	savedStateHandle: SavedStateHandle,
-	playlistRepository: PlaylistRepository,
-	private val playbackQueue: PlaybackQueue
-) : ViewModel() {
-	private val playlistId: Long = checkNotNull(savedStateHandle["playlistId"])
-
-	val playlist: StateFlow<PlaylistWithVideos?> =
-		playlistRepository.observePlaylistWithVideos(playlistId)
-			.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-
-	fun preparePlayback(videoId: Long) {
-		val ids = playlist.value?.videos?.map { it.id }.orEmpty()
-		playbackQueue.setQueue(ids, videoId)
-	}
-}
-
-@HiltViewModel
-class SmartCollectionViewModel @Inject constructor(
-	savedStateHandle: SavedStateHandle,
-	observeFavorites: ObserveFavoritesUseCase,
-	observeHistory: ObserveHistoryUseCase,
-	videoRepository: VideoRepository,
-	private val getVideoById: GetVideoByIdUseCase,
-	private val historyRepository: HistoryRepository,
-	private val toggleFavorite: ToggleFavoriteUseCase,
-	private val playbackQueue: PlaybackQueue
-) : ViewModel() {
-	val type: String = checkNotNull(savedStateHandle["type"])
-
-	val favorites: StateFlow<List<Video>> = observeFavorites()
-		.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-	val history: StateFlow<List<PlaybackHistory>> = observeHistory()
-		.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-	val mostPlayed: StateFlow<List<Video>> = videoRepository.observeMostPlayed(100)
-		.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-	private val _queueVideos = MutableStateFlow<List<Video>>(emptyList())
-	val queueVideos: StateFlow<List<Video>> = _queueVideos.asStateFlow()
-
-	init {
-		if (type == Screen.SmartCollection.QUEUE) {
-			viewModelScope.launch { refreshQueue() }
-		}
-	}
-
-	private suspend fun refreshQueue() {
-		_queueVideos.value = playbackQueue.ids().mapNotNull { getVideoById(it) }
-	}
-
-	fun toggleFavorite(videoId: Long) {
-		viewModelScope.launch { toggleFavorite(videoId) }
-	}
-
-	fun clearHistory() {
-		viewModelScope.launch { historyRepository.clearHistory() }
-	}
-
-	fun prepareFromVideos(videos: List<Video>, videoId: Long) {
-		playbackQueue.setQueue(videos.map { it.id }, videoId)
-	}
-
-	fun prepareFromHistory(items: List<PlaybackHistory>, videoId: Long) {
-		playbackQueue.setQueue(items.map { it.videoId }, videoId)
-	}
-
-	fun prepareFromQueue(videoId: Long) {
-		playbackQueue.ensureSingle(videoId)
-	}
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -218,20 +79,14 @@ fun PlaylistsScreen(
 	var name by remember { mutableStateOf("") }
 
 	val smartCategories = listOf(
-		SmartCategory(Screen.SmartCollection.FAVORITES, "Favorites", "$favoritesCount videos", Icons.Default.Favorite),
-		SmartCategory(Screen.SmartCollection.HISTORY, "History", "$historyCount watched", Icons.Default.History),
-		SmartCategory(Screen.SmartCollection.MOST_PLAYED, "Most played", "$mostPlayedCount videos", Icons.Default.Whatshot),
-		SmartCategory(Screen.SmartCollection.RECENT, "Recently played", "Continue watching", Icons.Default.History),
-		SmartCategory(Screen.SmartCollection.QUEUE, "Playback queue", "Current session", Icons.AutoMirrored.Filled.QueueMusic)
+		SmartCategory(Screen.SmartCollection.FAVORITES, "Favoritos", "$favoritesCount videos", Icons.Default.Favorite),
+		SmartCategory(Screen.SmartCollection.HISTORY, "Historial", "$historyCount vistos", Icons.Default.History),
+		SmartCategory(Screen.SmartCollection.MOST_PLAYED, "Mas reproducidos", "$mostPlayedCount videos", Icons.Default.Whatshot),
+		SmartCategory(Screen.SmartCollection.RECENT, "Vistos recientemente", "Seguir viendo", Icons.Default.History),
+		SmartCategory(Screen.SmartCollection.QUEUE, "Cola de reproduccion", "Sesion actual", Icons.AutoMirrored.Filled.QueueMusic)
 	)
 
-	val gradient = Brush.verticalGradient(
-		colors = listOf(
-			MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
-			MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f),
-			MaterialTheme.colorScheme.background
-		)
-	)
+	val gradient = screenGradient()
 
 	Scaffold(
 		containerColor = Color.Transparent,
@@ -246,7 +101,7 @@ fun PlaylistsScreen(
 		},
 		floatingActionButton = {
 			FloatingActionButton(onClick = { showDialog = true }) {
-				Icon(Icons.Default.Add, contentDescription = "Create playlist")
+				Icon(Icons.Default.Add, contentDescription = "Crear lista")
 			}
 		}
 	) { padding ->
@@ -263,7 +118,7 @@ fun PlaylistsScreen(
 			) {
 				item {
 					Text(
-						text = "Smart collections",
+						text = "Colecciones inteligentes",
 						style = MaterialTheme.typography.titleMedium,
 						color = MaterialTheme.colorScheme.primary
 					)
@@ -274,7 +129,7 @@ fun PlaylistsScreen(
 				item {
 					Spacer(modifier = Modifier.height(8.dp))
 					Text(
-						text = "Your playlists",
+						text = "Tus listas",
 						style = MaterialTheme.typography.titleMedium,
 						color = MaterialTheme.colorScheme.primary
 					)
@@ -313,12 +168,12 @@ fun PlaylistsScreen(
 	if (showDialog) {
 		AlertDialog(
 			onDismissRequest = { showDialog = false },
-			title = { Text("New playlist") },
+			title = { Text("Nueva lista") },
 			text = {
 				OutlinedTextField(
 					value = name,
 					onValueChange = { name = it },
-					label = { Text("Name") },
+					label = { Text("Nombre") },
 					singleLine = true,
 					modifier = Modifier.fillMaxWidth()
 				)
@@ -332,10 +187,12 @@ fun PlaylistsScreen(
 							showDialog = false
 						}
 					}
-				) { Text("Create") }
+				) { Text("Crear") }
+
+				
 			},
 			dismissButton = {
-				TextButton(onClick = { showDialog = false }) { Text("Cancel") }
+				TextButton(onClick = { showDialog = false }) { Text("Cancelar") }
 			}
 		)
 	}
@@ -384,21 +241,15 @@ fun SmartCollectionScreen(
 	viewModel: SmartCollectionViewModel = hiltViewModel()
 ) {
 	val title = when (viewModel.type) {
-		Screen.SmartCollection.FAVORITES -> "Favorites"
-		Screen.SmartCollection.HISTORY -> "History"
-		Screen.SmartCollection.MOST_PLAYED -> "Most played"
-		Screen.SmartCollection.RECENT -> "Recently played"
-		Screen.SmartCollection.QUEUE -> "Playback queue"
-		else -> "Collection"
+		Screen.SmartCollection.FAVORITES -> "Favoritos"
+		Screen.SmartCollection.HISTORY -> "Historial"
+		Screen.SmartCollection.MOST_PLAYED -> "Mas reproducidos"
+		Screen.SmartCollection.RECENT -> "Vistos recientemente"
+		Screen.SmartCollection.QUEUE -> "Cola de reproduccion"
+		else -> "Coleccion"
 	}
 
-	val gradient = Brush.verticalGradient(
-		colors = listOf(
-			MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
-			MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f),
-			MaterialTheme.colorScheme.background
-		)
-	)
+	val gradient = screenGradient()
 
 	Scaffold(
 		containerColor = Color.Transparent,
@@ -506,7 +357,7 @@ fun SmartCollectionScreen(
 						onFavorite = viewModel::toggleFavorite
 					)
 				}
-				else -> EmptyState("Unknown", "Unsupported collection")
+				else -> EmptyState("Desconocido", "Coleccion no soportada")
 			}
 		}
 	}
@@ -553,13 +404,7 @@ fun PlaylistDetailScreen(
 ) {
 	val playlist by viewModel.playlist.collectAsStateWithLifecycle()
 
-	val gradient = Brush.verticalGradient(
-		colors = listOf(
-			MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
-			MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f),
-			MaterialTheme.colorScheme.background
-		)
-	)
+	val gradient = screenGradient()
 
 	Scaffold(
 		containerColor = Color.Transparent,
@@ -587,8 +432,8 @@ fun PlaylistDetailScreen(
 			val videos = playlist?.videos.orEmpty()
 			if (videos.isEmpty()) {
 				EmptyState(
-					title = "Empty playlist",
-					subtitle = "Add videos from the library."
+					title = "Lista vacia",
+					subtitle = "Agrega videos desde la biblioteca."
 				)
 			} else {
 				LazyVerticalGrid(

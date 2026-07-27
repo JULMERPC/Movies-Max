@@ -14,10 +14,10 @@ interface SettingsRepository {
 	suspend fun setAutoPlayNext(enabled: Boolean)
 	suspend fun setSeekStepSeconds(seconds: Int)
 	suspend fun setShowHiddenFiles(enabled: Boolean)
+	suspend fun setShowNomedia(enabled: Boolean)
 	suspend fun setGesturesEnabled(enabled: Boolean)
 	suspend fun setAutoPip(enabled: Boolean)
-	suspend fun setBlacklist(entries: List<String>)
-	suspend fun addBlacklistEntry(entry: String)
-	suspend fun removeBlacklistEntry(entry: String)
 	suspend fun setLastScanTimestamp(timestamp: Long)
+	suspend fun setPrivateFolderPin(pin: String?)
+	suspend fun setPrivateVideoIds(ids: List<Long>)
 }

@@ -4,6 +4,7 @@ sealed class Screen(val route: String) {
 	data object Library : Screen("library")
 	data object Playlists : Screen("playlists")
 	data object Settings : Screen("settings")
+	data object PrivateFolder : Screen("private_folder")
 	data object Player : Screen("player/{videoId}") {
 		fun createRoute(videoId: Long) = "player/$videoId"
 	}
@@ -22,9 +23,3 @@ sealed class Screen(val route: String) {
 		const val QUEUE = "queue"
 	}
 }
-
-val bottomNavItems = listOf(
-	Screen.Library,
-	Screen.Playlists,
-	Screen.Settings
-)

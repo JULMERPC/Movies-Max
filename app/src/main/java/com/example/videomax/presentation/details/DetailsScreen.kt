@@ -76,10 +76,10 @@ fun DetailsScreen(
 	Scaffold(
 		topBar = {
 			TopAppBar(
-				title = { Text(video?.displayName ?: "Details") },
-				navigationIcon = {
-					IconButton(onClick = onBack) {
-						Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+			title = { Text(video?.displayName ?: "Detalles") },
+			navigationIcon = {
+				IconButton(onClick = onBack) {
+					Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
 					}
 				}
 			)
@@ -110,15 +110,15 @@ fun DetailsScreen(
 			) {
 				Icon(Icons.Default.PlayArrow, contentDescription = null)
 				Spacer(modifier = Modifier.height(0.dp))
-				Text("Play")
+				Text("Reproducir")
 			}
 			Spacer(modifier = Modifier.height(8.dp))
-			InfoRow("Resolution", current.resolutionLabel)
-			InfoRow("Duration", Formatters.formatDuration(current.durationMs))
-			InfoRow("Size", Formatters.formatFileSize(current.sizeBytes))
-			InfoRow("Codec / container", current.codec ?: current.mimeType)
-			InfoRow("Folder", current.folderName)
-			InfoRow("Location", current.path ?: current.uri)
+			InfoRow("Resolucion", current.resolutionLabel)
+			InfoRow("Duracion", Formatters.formatDuration(current.durationMs))
+			InfoRow("Tamano", Formatters.formatFileSize(current.sizeBytes))
+			InfoRow("Codec / contenedor", current.codec ?: current.mimeType)
+			InfoRow("Carpeta", current.folderName)
+			InfoRow("Ubicacion", current.path ?: current.uri)
 			InfoRow("MIME", current.mimeType)
 		}
 	}

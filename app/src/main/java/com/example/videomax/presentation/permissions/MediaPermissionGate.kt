@@ -58,7 +58,7 @@ fun MediaPermissionGate(
 			)
 			Spacer(modifier = Modifier.height(24.dp))
 			Button(onClick = onRequestPermission) {
-				Text("Grant access")
+				Text("Conceder acceso")
 			}
 		}
 	}

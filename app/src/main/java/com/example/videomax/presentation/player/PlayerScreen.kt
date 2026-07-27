@@ -665,25 +665,30 @@ private fun PlayerControlsOverlay(
 				.statusBarsPadding()
 				.padding(top = 4.dp, end = 6.dp)
 		) {
-			PlayerSideActions(
-				isMuted = state.volumeFraction <= 0f,
-				isFavorite = state.video?.isFavorite == true,
-				isOrientationLocked = state.orientation != PlayerOrientation.AUTO,
-				onCycleOrientation = {
-					val isLandscape = activity.resources.configuration.orientation ==
-						android.content.res.Configuration.ORIENTATION_LANDSCAPE
-					viewModel.cycleOrientation(isLandscape)
-				},
-				onToggleMute = {
-					if (state.volumeFraction > 0f) {
-						viewModel.setVolumeFraction(0f, fromGesture = false)
-					} else {
-						viewModel.setVolumeFraction(0.5f, fromGesture = false)
-					}
-				},
-				onScreenshot = onScreenshot,
-				onToggleFavorite = onToggleFavorite
-			)
+		PlayerSideActions(
+			isMuted = state.volumeFraction <= 0f,
+			isFavorite = state.video?.isFavorite == true,
+			isOrientationLocked = state.orientation != PlayerOrientation.AUTO,
+			isAutoPip = state.autoPip,
+			playbackSpeed = state.playbackSpeed,
+			onCycleOrientation = {
+				val isLandscape = activity.resources.configuration.orientation ==
+					android.content.res.Configuration.ORIENTATION_LANDSCAPE
+				viewModel.cycleOrientation(isLandscape)
+			},
+			onToggleMute = {
+				if (state.volumeFraction > 0f) {
+					viewModel.setVolumeFraction(0f, fromGesture = false)
+				} else {
+					viewModel.setVolumeFraction(0.5f, fromGesture = false)
+				}
+			},
+			onScreenshot = onScreenshot,
+			onToggleAutoPip = viewModel::toggleAutoPip,
+			onCycleSpeed = { showSpeedMenu = true },
+			onOpenSettings = onOpenSettings,
+			onToggleFavorite = onToggleFavorite
+		)
 		}
 
 		if (!state.isLocked) {
@@ -704,14 +709,6 @@ private fun PlayerControlsOverlay(
 						.navigationBarsPadding()
 						.padding(horizontal = 14.dp, vertical = 6.dp)
 				) {
-					PlayerOptionsRow(
-						isAutoPip = state.autoPip,
-						playbackSpeed = state.playbackSpeed,
-						onToggleAutoPip = viewModel::toggleAutoPip,
-						onCycleSpeed = { showSpeedMenu = true },
-						onOpenSettings = onOpenSettings
-					)
-
 					PlayerTimelineBar(
 						progressState = viewModel.progressState,
 						onSeekFraction = { fraction ->
@@ -800,6 +797,7 @@ private fun VideoSettingsSheet(
 ) {
 	val sheetState = rememberModalBottomSheetState()
 	val context = LocalContext.current
+	val scope = rememberCoroutineScope()
 
 	ModalBottomSheet(
 		onDismissRequest = onDismiss,
@@ -818,31 +816,6 @@ private fun VideoSettingsSheet(
 			)
 
 			VideoSettingRow(
-				icon = Icons.Default.PlayCircle,
-				title = "Reproducción en fondo",
-				subtitle = "Seguir reproduciendo con pantalla apagada"
-			)
-			VideoSettingRow(
-				icon = Icons.Default.Equalizer,
-				title = "Ecualizador",
-				subtitle = "Ajustar audio"
-			)
-			VideoSettingRow(
-				icon = Icons.Default.DarkMode,
-				title = "Modo nocturno",
-				subtitle = "Reducir brillo y calor de color"
-			)
-			VideoSettingRow(
-				icon = Icons.Default.Timer,
-				title = "Temporizador",
-				subtitle = "Detener reproducción automáticamente"
-			)
-			VideoSettingRow(
-				icon = Icons.Default.Flip,
-				title = "Espejo",
-				subtitle = "Volcar imagen horizontalmente"
-			)
-			VideoSettingRow(
 				icon = Icons.Default.Repeat,
 				title = "Bucle",
 				subtitle = when (state.repeatMode) {
@@ -856,9 +829,12 @@ private fun VideoSettingsSheet(
 			VideoSettingRow(
 				icon = Icons.Default.Shuffle,
 				title = "Aleatorio",
-				subtitle = "Orden aleatorio de la cola",
+				subtitle = "Mezclar el orden de la cola",
 				onClick = {
-					viewModel.playQueueItem(0)
+					scope.launch {
+						viewModel.shuffleQueue()
+					}
+					onDismiss()
 				}
 			)
 			VideoSettingRow(
@@ -881,13 +857,6 @@ private fun VideoSettingsSheet(
 					}
 					onDismiss()
 				}
-			)
-			VideoSettingRow(
-				icon = Icons.Default.Delete,
-				title = "Eliminar",
-				subtitle = "Borrar este video del dispositivo",
-				isDestructive = true,
-				onClick = { onDismiss() }
 			)
 		}
 	}

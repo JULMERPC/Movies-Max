@@ -31,6 +31,7 @@ import com.example.videomax.presentation.player.PlayerScreen
 import com.example.videomax.presentation.playlists.PlaylistDetailScreen
 import com.example.videomax.presentation.playlists.PlaylistsScreen
 import com.example.videomax.presentation.playlists.SmartCollectionScreen
+import com.example.videomax.presentation.settings.PrivateFolderScreen
 import com.example.videomax.presentation.settings.SettingsScreen
 
 private data class BottomItem(
@@ -106,7 +107,16 @@ fun VideoPlayerNavHost() {
 				)
 			}
 			composable(Screen.Settings.route) {
-				SettingsScreen()
+				SettingsScreen(
+					onOpenPrivateFolder = {
+						navController.navigate(Screen.PrivateFolder.route)
+					}
+				)
+			}
+			composable(Screen.PrivateFolder.route) {
+				PrivateFolderScreen(
+					onBack = { navController.popBackStack() }
+				)
 			}
 			composable(
 				route = Screen.Player.route,

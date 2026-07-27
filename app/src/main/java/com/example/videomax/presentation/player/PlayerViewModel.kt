@@ -79,9 +79,13 @@ class PlayerViewModel @Inject constructor(
 	private val playbackQueue: PlaybackQueue,
 	private val videoRepository: VideoRepository,
 	private val settingsRepository: com.example.videomax.domain.repository.SettingsRepository,
-	observeSettings: ObserveSettingsUseCase,
-	val player: ExoPlayer
+	observeSettings: ObserveSettingsUseCase
 ) : AndroidViewModel(application) {
+
+	val player: ExoPlayer = ExoPlayer.Builder(application).build().apply {
+		playWhenReady = true
+		repeatMode = Player.REPEAT_MODE_OFF
+	}
 
 	private val initialVideoId: Long = checkNotNull(savedStateHandle["videoId"])
 
@@ -187,6 +191,11 @@ class PlayerViewModel @Inject constructor(
 			showControls()
 			scheduleSidecarSubtitleLoad(video)
 			viewModelScope.launch { maybeExpandAroundPlayhead() }
+
+			if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && !settings.autoPlayNext) {
+				player.pause()
+				_uiState.update { it.copy(isPlaying = false, controlsVisible = true) }
+			}
 		}
 
 		override fun onTracksChanged(tracks: Tracks) {
@@ -911,6 +920,7 @@ class PlayerViewModel @Inject constructor(
 		player.removeListener(playerListener)
 		player.stop()
 		player.clearMediaItems()
+		player.release()
 		cleanupScope.cancel()
 		super.onCleared()
 	}
