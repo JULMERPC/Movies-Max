@@ -30,8 +30,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -146,6 +148,18 @@ class LibraryViewModel @Inject constructor(
 			settingsRepository.settings.collect { settings ->
 				sortOption.value = settings.sortOption
 			}
+		}
+
+		viewModelScope.launch {
+			settingsRepository.settings
+				.map { it.showNomedia to it.showHiddenFiles }
+				.drop(1)
+				.distinctUntilChanged()
+				.collect {
+					if (hasAutoScanned.value) {
+						refresh()
+					}
+				}
 		}
 
 		val videoCollection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)

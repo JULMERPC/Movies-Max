@@ -23,7 +23,7 @@ fun screenGradient(): Brush = Brush.verticalGradient(
 fun scaffoldTintColor(): Color {
 	val primary = MaterialTheme.colorScheme.primary
 	return Color(primary.red, primary.green, primary.blue, 0.10f)
-		.compositeOver(Color.White)
+		.compositeOver(MaterialTheme.colorScheme.surface)
 }
 
 @Composable

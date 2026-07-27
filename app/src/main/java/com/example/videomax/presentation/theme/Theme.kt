@@ -162,8 +162,8 @@ private val AppShapes = Shapes(
 	extraLarge = RoundedCornerShape(28.dp)
 )
 
-private fun Color.alphaBlendWithWhite(alphaFraction: Float): Color =
-	Color(this.red, this.green, this.blue, alphaFraction).compositeOver(Color.White)
+private fun Color.alphaBlendWithBase(alphaFraction: Float, base: Color): Color =
+	Color(this.red, this.green, this.blue, alphaFraction).compositeOver(base)
 
 @Composable
 fun VideoPlayerProTheme(
@@ -181,9 +181,9 @@ fun VideoPlayerProTheme(
 	val dynamicColorAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
 	val colors: ColorScheme = when {
+		isAmoled -> AmoledColors
 		dynamicColorAvailable && darkTheme -> dynamicDarkColorScheme(context)
 		dynamicColorAvailable && !darkTheme -> dynamicLightColorScheme(context)
-		isAmoled -> AmoledColors
 		darkTheme -> DarkColors
 		else -> LightColors
 	}
@@ -194,7 +194,8 @@ fun VideoPlayerProTheme(
 		else -> LightExtended
 	}
 
-	val scaffoldColor = colors.primary.alphaBlendWithWhite(60f / 255f)
+	val scaffoldColor = if (isAmoled) Color.Black
+		else colors.primary.alphaBlendWithBase(60f / 255f, if (darkTheme) Color.Black else Color.White)
 
 	CompositionLocalProvider(LocalExtendedColors provides extendedColors) {
 		MaterialTheme(

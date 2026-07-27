@@ -81,18 +81,18 @@ fun SettingsScreen(
 	Scaffold(
 		containerColor = Color.Transparent,
 		topBar = {
-			TopAppBar(
-				title = { Text(stringResource(R.string.settings_title), color = VideoMaxTheme.extended.textPrimary) },
-				colors = TopAppBarDefaults.topAppBarColors(
-					containerColor = Color(
-						MaterialTheme.colorScheme.primary.red,
-						MaterialTheme.colorScheme.primary.green,
-						MaterialTheme.colorScheme.primary.blue,
-						0.10f
-					).compositeOver(Color.White),
-					titleContentColor = MaterialTheme.colorScheme.onSurface
-				)
+	TopAppBar(
+			title = { Text(stringResource(R.string.settings_title), color = VideoMaxTheme.extended.textPrimary) },
+			colors = TopAppBarDefaults.topAppBarColors(
+				containerColor = Color(
+					MaterialTheme.colorScheme.primary.red,
+					MaterialTheme.colorScheme.primary.green,
+					MaterialTheme.colorScheme.primary.blue,
+					0.10f
+				).compositeOver(MaterialTheme.colorScheme.surface),
+				titleContentColor = MaterialTheme.colorScheme.onSurface
 			)
+		)
 		}
 	) { padding ->
 		Box(

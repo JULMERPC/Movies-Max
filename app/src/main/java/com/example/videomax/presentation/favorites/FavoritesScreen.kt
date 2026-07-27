@@ -75,7 +75,7 @@ fun FavoritesScreen(
 						MaterialTheme.colorScheme.primary.green,
 						MaterialTheme.colorScheme.primary.blue,
 						0.10f
-					).compositeOver(Color.White)
+					).compositeOver(MaterialTheme.colorScheme.surface)
 				)
 			)
 		}

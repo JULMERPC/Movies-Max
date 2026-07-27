@@ -777,7 +777,7 @@ private fun PlayerControlsOverlay(
 					Icons.Default.Lock,
 					"Desbloquear",
 					tint = Color.White,
-					modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
+					modifier = Modifier.size(VideoMaxDimens.iconSizeMd)
 				)
 				Spacer(modifier = Modifier.width(VideoMaxDimens.spacingSm))
 				Text(

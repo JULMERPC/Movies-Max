@@ -335,7 +335,8 @@ class VideoRepositoryImpl @Inject constructor(
 
 	/**
 	 * Collects all directories that contain a .nomedia file.
-	 * Scans common media directories once, caches results.
+	 * Walks the external storage tree and checks every directory,
+	 * not just those starting with ".".
 	 */
 	private fun collectNomediaDirs(): Set<String> {
 		val dirs = mutableSetOf<String>()
@@ -347,7 +348,7 @@ class VideoRepositoryImpl @Inject constructor(
 			if (!root.isDirectory) continue
 			root.walkTopDown()
 				.maxDepth(6)
-				.filter { it.isDirectory && it.name.startsWith(".") }
+				.filter { it.isDirectory }
 				.forEach { dir ->
 					if (dir.listFiles()?.any { it.name.equals(".nomedia", ignoreCase = true) } == true) {
 						dirs.add(dir.absolutePath.lowercase())

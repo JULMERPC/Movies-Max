@@ -71,8 +71,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -169,6 +174,7 @@ fun LibraryScreen(
 		topBar = {
 			LibraryTopBar(
 				videoCountProvider = { state.videoCount },
+				folderCountProvider = { state.folders.size },
 				isGridProvider = { state.isGrid },
 				isSearchOpenProvider = { state.isSearchOpen },
 				queryProvider = { state.query },
@@ -347,6 +353,7 @@ fun LibraryScreen(
 @Composable
 fun LibraryTopBar(
 	videoCountProvider: () -> Int,
+	folderCountProvider: () -> Int,
 	isGridProvider: () -> Boolean,
 	isSearchOpenProvider: () -> Boolean,
 	queryProvider: () -> String,
@@ -359,19 +366,44 @@ fun LibraryTopBar(
 ) {
 	var sortMenuExpanded by remember { mutableStateOf(false) }
 	val videoCount = videoCountProvider()
+	val folderCount = folderCountProvider()
 	val isGrid = isGridProvider()
 	val isSearchOpen = isSearchOpenProvider()
 	val query = queryProvider()
 	val isScanning = isScanningProvider()
 
+	val primaryColor = MaterialTheme.colorScheme.primary
+	val tertiaryColor = MaterialTheme.colorScheme.tertiary
+
 	Column {
 		TopAppBar(
 			title = {
 				Column {
-					Text("videomax", style = MaterialTheme.typography.headlineSmall, color = VideoMaxTheme.extended.textPrimary)
 					Text(
-						text = "$videoCount videos",
-						style = MaterialTheme.typography.bodyMedium,
+						buildAnnotatedString {
+							withStyle(
+								SpanStyle(
+									color = primaryColor,
+									fontWeight = FontWeight.Bold,
+									fontSize = 22.sp,
+									letterSpacing = (-0.5).sp
+								)
+							) { append("Video") }
+							withStyle(
+								SpanStyle(
+									color = tertiaryColor,
+									fontWeight = FontWeight.Bold,
+									fontSize = 22.sp,
+									letterSpacing = (-0.5).sp
+								)
+							) { append("Max") }
+						},
+						style = MaterialTheme.typography.headlineMedium
+					)
+					Spacer(modifier = Modifier.height(2.dp))
+					Text(
+						text = "$videoCount videos · $folderCount carpetas",
+						style = MaterialTheme.typography.bodySmall,
 						color = VideoMaxTheme.extended.textTertiary
 					)
 				}
@@ -426,7 +458,7 @@ fun LibraryTopBar(
 					MaterialTheme.colorScheme.primary.green,
 					MaterialTheme.colorScheme.primary.blue,
 					0.10f
-				).compositeOver(Color.White),
+				).compositeOver(MaterialTheme.colorScheme.surface),
 				titleContentColor = MaterialTheme.colorScheme.onSurface
 			)
 		)
@@ -461,51 +493,59 @@ fun FilterModeSelector(
 	selectedMode: LibraryFilterMode,
 	onModeSelected: (LibraryFilterMode) -> Unit
 ) {
-	LazyRow(
-		contentPadding = PaddingValues(horizontal = VideoMaxDimens.spacingLg, vertical = VideoMaxDimens.spacingSm),
-		horizontalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingSm)
-	) {
-		item {
-			FilterChip(
-				selected = selectedMode == LibraryFilterMode.ALL_VIDEOS,
-				onClick = { onModeSelected(LibraryFilterMode.ALL_VIDEOS) },
-				label = { Text("Todos los videos") },
-				leadingIcon = {
-					Icon(
-						Icons.Default.VideoFile,
-						contentDescription = null,
-						modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
-					)
-				}
-			)
-		}
-		item {
-			FilterChip(
-				selected = selectedMode == LibraryFilterMode.ALL_FOLDERS,
-				onClick = { onModeSelected(LibraryFilterMode.ALL_FOLDERS) },
-				label = { Text("Todas las carpetas") },
-				leadingIcon = {
-					Icon(
-						Icons.Default.Folder,
-						contentDescription = null,
-						modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
-					)
-				}
-			)
-		}
-		item {
-			FilterChip(
-				selected = selectedMode == LibraryFilterMode.FOLDER_TREE,
-				onClick = { onModeSelected(LibraryFilterMode.FOLDER_TREE) },
-				label = { Text("Árbol de carpetas") },
-				leadingIcon = {
-					Icon(
-						Icons.Default.CreateNewFolder,
-						contentDescription = null,
-						modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
-					)
-				}
-			)
+	Column(modifier = Modifier.padding(top = VideoMaxDimens.spacingSm)) {
+		Text(
+			text = "Explorar",
+			style = MaterialTheme.typography.titleMedium,
+			color = VideoMaxTheme.extended.textSecondary,
+			modifier = Modifier.padding(horizontal = VideoMaxDimens.spacingLg, vertical = VideoMaxDimens.spacingXs)
+		)
+		LazyRow(
+			contentPadding = PaddingValues(horizontal = VideoMaxDimens.spacingLg, vertical = VideoMaxDimens.spacingXs),
+			horizontalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingSm)
+		) {
+			item {
+				FilterChip(
+					selected = selectedMode == LibraryFilterMode.ALL_VIDEOS,
+					onClick = { onModeSelected(LibraryFilterMode.ALL_VIDEOS) },
+					label = { Text("Todos los videos") },
+					leadingIcon = {
+						Icon(
+							Icons.Default.VideoFile,
+							contentDescription = null,
+							modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
+						)
+					}
+				)
+			}
+			item {
+				FilterChip(
+					selected = selectedMode == LibraryFilterMode.ALL_FOLDERS,
+					onClick = { onModeSelected(LibraryFilterMode.ALL_FOLDERS) },
+					label = { Text("Todas las carpetas") },
+					leadingIcon = {
+						Icon(
+							Icons.Default.Folder,
+							contentDescription = null,
+							modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
+						)
+					}
+				)
+			}
+			item {
+				FilterChip(
+					selected = selectedMode == LibraryFilterMode.FOLDER_TREE,
+					onClick = { onModeSelected(LibraryFilterMode.FOLDER_TREE) },
+					label = { Text("Árbol de carpetas") },
+					leadingIcon = {
+						Icon(
+							Icons.Default.CreateNewFolder,
+							contentDescription = null,
+							modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
+						)
+					}
+				)
+			}
 		}
 	}
 }

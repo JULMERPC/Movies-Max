@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -202,7 +203,7 @@ internal fun PlayerTopBar(
 				Icons.AutoMirrored.Filled.ArrowBack,
 				"Volver",
 				tint = Color.White,
-				modifier = Modifier.size(VideoMaxDimens.iconSizeMd)
+				modifier = Modifier.size(VideoMaxDimens.iconSizeLg)
 			)
 		}
 		RippleIconButton(onClick = onOpenQueue) {
@@ -210,18 +211,19 @@ internal fun PlayerTopBar(
 				Icons.AutoMirrored.Filled.List,
 				"Cola",
 				tint = Color.White,
-				modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
+				modifier = Modifier.size(VideoMaxDimens.iconSizeMd)
 			)
 		}
 		Text(
 			text = fileName,
 			color = Color.White.copy(alpha = VideoMaxDimens.alphaHigh),
-			style = MaterialTheme.typography.titleSmall,
+			style = MaterialTheme.typography.titleMedium,
 			maxLines = 1,
 			modifier = Modifier
 				.weight(1f)
 				.padding(horizontal = VideoMaxDimens.spacingSm)
 		)
+		Spacer(modifier = Modifier.width(72.dp))
 	}
 }
 
@@ -242,69 +244,69 @@ internal fun PlayerSideActions(
 	modifier: Modifier = Modifier
 ) {
 	Column(
-		verticalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingXs),
+		verticalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingSm),
 		horizontalAlignment = Alignment.CenterHorizontally,
 		modifier = modifier
 			.background(
 				Color.Black.copy(alpha = VideoMaxDimens.alphaOverlay),
 				RoundedCornerShape(VideoMaxDimens.radiusMd)
 			)
-			.padding(vertical = VideoMaxDimens.spacingSm, horizontal = VideoMaxDimens.spacingXs)
+			.padding(vertical = VideoMaxDimens.spacingMd, horizontal = VideoMaxDimens.spacingSm)
 	) {
-		RippleIconButton(onClick = onCycleOrientation) {
+		RippleIconButton(onClick = onCycleOrientation, size = 44.dp) {
 			Icon(
 				Icons.Default.ScreenRotation,
 				if (isOrientationLocked) "Bloquear orientación" else "Permitir rotación",
 				tint = if (isOrientationLocked) MaterialTheme.colorScheme.secondary else Color.White,
-				modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
+				modifier = Modifier.size(VideoMaxDimens.iconSizeMd)
 			)
 		}
-		RippleIconButton(onClick = onToggleMute) {
+		RippleIconButton(onClick = onToggleMute, size = 44.dp) {
 			Icon(
 				if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
 				"Silenciar",
 				tint = Color.White,
-				modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
+				modifier = Modifier.size(VideoMaxDimens.iconSizeMd)
 			)
 		}
-		RippleIconButton(onClick = onScreenshot) {
+		RippleIconButton(onClick = onScreenshot, size = 44.dp) {
 			Icon(
 				Icons.Default.Camera,
 				"Captura",
 				tint = Color.White,
-				modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
+				modifier = Modifier.size(VideoMaxDimens.iconSizeMd)
 			)
 		}
-		RippleIconButton(onClick = onToggleAutoPip) {
+		RippleIconButton(onClick = onToggleAutoPip, size = 44.dp) {
 			Icon(
 				Icons.Default.PictureInPicture,
 				contentDescription = "PiP",
 				tint = if (isAutoPip) MaterialTheme.colorScheme.primary else Color.White,
-				modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
+				modifier = Modifier.size(VideoMaxDimens.iconSizeMd)
 			)
 		}
-		RippleIconButton(onClick = onCycleSpeed) {
+		RippleIconButton(onClick = onCycleSpeed, size = 44.dp) {
 			Icon(
 				Icons.Default.Speed,
 				contentDescription = "Velocidad",
 				tint = Color.White,
-				modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
+				modifier = Modifier.size(VideoMaxDimens.iconSizeMd)
 			)
 		}
-		RippleIconButton(onClick = onOpenSettings) {
+		RippleIconButton(onClick = onOpenSettings, size = 44.dp) {
 			Icon(
 				Icons.Default.Settings,
 				contentDescription = "Ajustes del video",
 				tint = Color.White,
-				modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
+				modifier = Modifier.size(VideoMaxDimens.iconSizeMd)
 			)
 		}
-		RippleIconButton(onClick = onToggleFavorite) {
+		RippleIconButton(onClick = onToggleFavorite, size = 44.dp) {
 			Icon(
 				if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
 				"Favorito",
 				tint = if (isFavorite) MaterialTheme.colorScheme.secondary else Color.White,
-				modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
+				modifier = Modifier.size(VideoMaxDimens.iconSizeMd)
 			)
 		}
 	}
@@ -401,56 +403,56 @@ internal fun PlayerTransportRow(
 		horizontalArrangement = Arrangement.SpaceBetween,
 		verticalAlignment = Alignment.CenterVertically
 	) {
-		RippleIconButton(onClick = onToggleLock, size = 40.dp) {
+		RippleIconButton(onClick = onToggleLock, size = 48.dp) {
 			Icon(
 				if (isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
 				"Bloquear",
 				tint = Color.White.copy(alpha = if (isLocked) VideoMaxDimens.alphaHigh else VideoMaxDimens.alphaMedium),
-				modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
+				modifier = Modifier.size(VideoMaxDimens.iconSizeMd)
 			)
 		}
 
 		Row(
 			verticalAlignment = Alignment.CenterVertically,
-			horizontalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingLg)
+			horizontalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingXxl)
 		) {
-			RippleIconButton(onClick = onPrevious, size = 40.dp) {
+			RippleIconButton(onClick = onPrevious, size = 48.dp) {
 				Icon(
 					Icons.Default.SkipPrevious,
 					"Anterior",
 					tint = Color.White,
-					modifier = Modifier.size(VideoMaxDimens.iconSizeMd)
+					modifier = Modifier.size(VideoMaxDimens.iconSizeLg)
 				)
 			}
 			IconButton(
 				onClick = onTogglePlayPause,
 				modifier = Modifier
-					.size(64.dp)
+					.size(72.dp)
 					.background(Color.White, CircleShape)
 			) {
 				Icon(
 					if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
 					if (isPlaying) "Pausar" else "Reproducir",
 					tint = Color.Black,
-					modifier = Modifier.size(34.dp)
+					modifier = Modifier.size(38.dp)
 				)
 			}
-			RippleIconButton(onClick = onNext, size = 40.dp) {
+			RippleIconButton(onClick = onNext, size = 48.dp) {
 				Icon(
 					Icons.Default.SkipNext,
 					"Siguiente",
 					tint = if (nextEnabled) Color.White else Color.White.copy(VideoMaxDimens.alphaDisabled),
-					modifier = Modifier.size(VideoMaxDimens.iconSizeMd)
+					modifier = Modifier.size(VideoMaxDimens.iconSizeLg)
 				)
 			}
 		}
 
-		RippleIconButton(onClick = onCycleResize, size = 40.dp) {
+		RippleIconButton(onClick = onCycleResize, size = 48.dp) {
 			Icon(
 				Icons.Default.AspectRatio,
 				"Tamaño de pantalla",
 				tint = Color.White.copy(alpha = VideoMaxDimens.alphaMedium),
-				modifier = Modifier.size(VideoMaxDimens.iconSizeSm)
+				modifier = Modifier.size(VideoMaxDimens.iconSizeMd)
 			)
 		}
 	}
