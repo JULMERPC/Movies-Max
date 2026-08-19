@@ -233,21 +233,26 @@ fun MusicScreen(
 						MusicTab.SONGS -> SongsTab(
 							songs = lazySongs,
 							uiState = uiState,
-							onSongClick = { song ->
-								val item = AudioQueueItem(
-									videoId = song.id,
-									uri = song.uri,
-									displayName = song.title,
-									artist = song.artist,
-									album = song.album,
-									albumId = song.albumId
-								)
-								BackgroundAudioManager.playQueue(listOf(item), 0, true)
-								val serviceIntent = Intent(context, BackgroundAudioService::class.java)
-								if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-									context.startForegroundService(serviceIntent)
-								} else {
-									context.startService(serviceIntent)
+							onSongClick = { song, index ->
+								val allSongs = (0 until lazySongs.itemCount).mapNotNull { lazySongs[it] }
+								val items = allSongs.map { s ->
+									AudioQueueItem(
+										videoId = s.id,
+										uri = s.uri,
+										displayName = s.title,
+										artist = s.artist,
+										album = s.album,
+										albumId = s.albumId
+									)
+								}
+								if (items.isNotEmpty()) {
+									BackgroundAudioManager.playQueue(items, index.coerceIn(0, items.lastIndex), true)
+									val serviceIntent = Intent(context, BackgroundAudioService::class.java)
+									if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+										context.startForegroundService(serviceIntent)
+									} else {
+										context.startService(serviceIntent)
+									}
 								}
 							},
 							onSongFavorite = { viewModel.toggleFavorite(it) },
@@ -256,11 +261,19 @@ fun MusicScreen(
 						)
 						MusicTab.ALBUMS -> AlbumsTab(
 							albums = uiState.albums,
-							onAlbumClick = { }
+							onAlbumClick = { album ->
+								viewModel.setQuery(album.name)
+								viewModel.setSortOption(MusicSortOption.TITLE_ASC)
+								viewModel.setSelectedTab(MusicTab.SONGS)
+							}
 						)
 						MusicTab.ARTISTS -> ArtistsTab(
 							artists = uiState.artists,
-							onArtistClick = { }
+							onArtistClick = { artist ->
+								viewModel.setQuery(artist.name)
+								viewModel.setSortOption(MusicSortOption.TITLE_ASC)
+								viewModel.setSelectedTab(MusicTab.SONGS)
+							}
 						)
 						MusicTab.FOLDERS -> FoldersTab(
 							folders = uiState.folders,
@@ -328,7 +341,7 @@ private fun MusicTabRow(
 private fun SongsTab(
 	songs: androidx.paging.compose.LazyPagingItems<Song>,
 	uiState: MusicUiState,
-	onSongClick: (Song) -> Unit,
+	onSongClick: (Song, Int) -> Unit,
 	onSongFavorite: (Song) -> Unit,
 	onSortChange: (MusicSortOption) -> Unit,
 	onClearFolder: () -> Unit = {}
@@ -405,7 +418,7 @@ private fun SongsTab(
 						song = song,
 						isCurrentlyPlaying = song.id == currentPlayingId,
 						isPlaying = isPlaying,
-						onClick = { onSongClick(song) },
+						onClick = { onSongClick(song, index) },
 						onFavorite = { onSongFavorite(song) }
 					)
 				}
@@ -694,11 +707,4 @@ private fun EmptyTabState(title: String, subtitle: String) {
 			)
 		}
 	}
-}
-
-private fun formatTime(ms: Long): String {
-	val totalSeconds = ms / 1000
-	val minutes = totalSeconds / 60
-	val seconds = totalSeconds % 60
-	return "%d:%02d".format(minutes, seconds)
 }

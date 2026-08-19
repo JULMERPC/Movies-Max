@@ -28,6 +28,7 @@ import android.content.Context
 import android.net.Uri
 import android.provider.MediaStore
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -315,6 +316,35 @@ class VideoRepositoryImpl @Inject constructor(
 			yield()
 		}
 
+		// Direct filesystem scan for .nomedia directories when enabled
+		if (settings.showNomedia) {
+			val mediaStorePaths = videoDao.getAllPaths()
+			val fsVideos = collectFilesystemVideos()
+				.filter { video -> mediaStorePaths.none { it.equals(video.path, ignoreCase = true) } }
+
+			if (fsVideos.isNotEmpty()) {
+				val fsUserState = videoDao.getUserStatesForIds(fsVideos.map { it.id }).associateBy { it.id }
+				val fsMerged = fsVideos.map { fresh ->
+					val state = fsUserState[fresh.id]
+					if (state != null) {
+						fresh.copy(
+							isFavorite = state.isFavorite,
+							lastPositionMs = state.lastPositionMs,
+							playCount = state.playCount,
+							isNew = state.isNew
+						)
+					} else {
+						fresh.copy(isNew = !isFirstScan)
+					}
+				}
+				videoDao.upsertAll(fsMerged)
+				videoDao.insertScanKeepIds(fsMerged.map { ScanKeepIdEntity(it.id) })
+				keptAny = true
+				indexed += fsMerged.size
+				onProgress?.invoke(indexed, indexed)
+			}
+		}
+
 		if (!receivedAny || !keptAny) {
 			videoDao.clearAll()
 			videoDao.clearScanKeepIds()
@@ -371,6 +401,82 @@ class VideoRepositoryImpl @Inject constructor(
 		return nomediaDirs.any { nomediaDir ->
 			path.startsWith(nomediaDir)
 		}
+	}
+
+	/**
+	 * Scans known directories directly for video files that MediaStore misses
+	 * due to .nomedia exclusions (WhatsApp Private, Documents, etc.).
+	 */
+	private suspend fun collectFilesystemVideos(): List<VideoEntity> {
+		val results = mutableListOf<VideoEntity>()
+		val storageRoot = android.os.Environment.getExternalStorageDirectory() ?: return results
+		val settings = settingsRepository.settings.first()
+		val knownDirs = listOf(
+			"WhatsApp/Media/WhatsApp Video",
+			"WhatsApp/Media/WhatsApp Private",
+			"WhatsApp/Media/WhatsApp Sent",
+			"WhatsApp/Video",
+			"Documents",
+			"Download",
+			"DCIM",
+			"Movies",
+			"Video"
+		)
+		val videoExtensions = setOf("mp4", "3gp", "mkv", "avi", "mov", "webm", "flv", "wmv", "m4v", "ts", "mpg", "mpeg")
+
+		for (dirName in knownDirs) {
+			val dir = File(storageRoot, dirName)
+			if (!dir.isDirectory) continue
+
+			try {
+				dir.walkTopDown()
+					.maxDepth(6)
+					.filter { it.isFile && it.extension.lowercase() in videoExtensions }
+					.forEach { file ->
+						try {
+							if (!settings.showHiddenFiles && file.isHidden) return@forEach
+
+							val path = file.absolutePath
+							val mime = when (file.extension.lowercase()) {
+								"mp4", "m4v" -> "video/mp4"
+								"3gp" -> "video/3gpp"
+								"mkv" -> "video/x-matroska"
+								"avi" -> "video/x-msvideo"
+								"mov" -> "video/quicktime"
+								"webm" -> "video/webm"
+								"flv" -> "video/x-flv"
+								"wmv" -> "video/x-ms-wmv"
+								"ts" -> "video/mp2t"
+								"mpg", "mpeg" -> "video/mpeg"
+								else -> "video/*"
+							}
+
+							val id = (path.hashCode().toLong() + Long.MAX_VALUE / 2)
+
+							results += VideoEntity(
+								id = id,
+								uri = Uri.fromFile(file).toString(),
+								displayName = file.name,
+								path = path,
+								durationMs = 0L,
+								sizeBytes = file.length(),
+								width = 0,
+								height = 0,
+								mimeType = mime,
+								dateAdded = file.lastModified(),
+								dateModified = file.lastModified(),
+								folderName = dirName,
+								codec = null
+							)
+						} catch (_: Exception) {
+							// skip unreadable files
+						}
+					}
+			} catch (_: Exception) {
+				// skip dirs we can't walk
+			}
+		}
+		return results
 	}
 
 	override suspend fun updateFavorite(videoId: Long, isFavorite: Boolean) {

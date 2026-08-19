@@ -341,6 +341,9 @@ interface VideoDao {
 	@Query("SELECT COUNT(*) FROM videos")
 	suspend fun count(): Int
 
+	@Query("SELECT path FROM videos WHERE path IS NOT NULL")
+	suspend fun getAllPaths(): List<String>
+
 	@Query("DELETE FROM videos WHERE id IN (:ids)")
 	suspend fun deleteByIds(ids: List<Long>)
 

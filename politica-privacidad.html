@@ -1,125 +1,407 @@
-<h2>Política de Privacidad — VideoMax</h2>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Política de Privacidad — Jualix</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; color: #333; }
+        h1 { color: #1a1a1a; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; }
+        h2 { color: #2c2c2c; margin-top: 30px; }
+        h3 { color: #444; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { border: 1px solid #ddd; padding: 10px 12px; text-align: left; }
+        th { background-color: #f5f5f5; font-weight: 600; }
+        code { background-color: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+        ul { padding-left: 20px; }
+        li { margin-bottom: 6px; }
+        .meta { color: #666; font-size: 0.9em; margin-bottom: 20px; }
+        hr { border: none; border-top: 1px solid #e0e0e0; margin: 30px 0; }
+        strong { color: #1a1a1a; }
+    </style>
+</head>
+<body>
 
-<p><strong>Última actualización:</strong> 28 de julio de 2026</p>
+<h1>Política de Privacidad</h1>
 
-<p>VideoMax es una aplicación de uso gratuito que funciona como reproductor de videos local. Esta política de privacidad describe qué datos recopila la app, cómo los utiliza y los derechos del usuario.</p>
+<p class="meta">
+    <strong>Aplicación:</strong> Jualix<br>
+    <strong>Package name:</strong> com.puma.videomax<br>
+    <strong>Desarrollador:</strong> Puma Studio<br>
+    <strong>Correo de contacto:</strong> julmerpumacondori@gmail.com<br>
+    <strong>Última actualización:</strong> 18 de agosto de 2026
+</p>
+
+<p>Jualix es una aplicación gratuita de reproducción de video y música para dispositivos Android. Esta política de privacidad describe qué datos recopila la aplicación, cómo los utiliza y los derechos del usuario.</p>
 
 <hr>
 
-<h3>1. Datos que recopila la aplicación</h3>
+<h2>1. Identificación de la aplicación y desarrollador</h2>
 
-<p><strong>VideoMax NO recopila, almacena ni transmite datos personales a servidores externos.</strong></p>
-
-<p>La aplicación funciona de manera <strong>100% offline</strong>. No se realizan conexiones a internet, no se envían datos a servicios de terceros y no se utilizan servidores propios.</p>
-
-<p>La app accede únicamente a los siguientes recursos del dispositivo de forma <strong>local y exclusiva</strong>:</p>
-
-<ul>
-  <li><strong>Archivos de video almacenados en el dispositivo</strong> — Para escanear, listar y reproducir los videos del usuario.</li>
-  <li><strong>Metadatos de los videos</strong> — Nombre, duración, tamaño, resolución, formato MIME, fecha de creación y carpeta contenedora. Estos datos se utilizan únicamente para mostrar la biblioteca dentro de la app.</li>
-  <li><strong>Preferencias de uso</strong> — Configuración de tema, velocidad de reproducción, posición recordada y opciones de la biblioteca. Se almacenan únicamente en el dispositivo (DataStore local).</li>
-  <li><strong>Historial de reproducción y listas</strong> — Se almacenan únicamente en una base de datos local (Room) en el dispositivo del usuario.</li>
-</ul>
-
-<h3>2. Permisos utilizados</h3>
-
-<table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%;">
-  <thead>
-    <tr style="background-color: #f2f2f2;">
-      <th>Permiso</th>
-      <th>Propósito</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code>READ_MEDIA_VIDEO</code></td>
-      <td>Acceder a los archivos de video del dispositivo para mostrarlos en la biblioteca y reproducirlos.</td>
-    </tr>
-    <tr>
-      <td><code>READ_MEDIA_VISUAL_USER_SELECTED</code></td>
-      <td>Acceso parcial a videos (Android 14+), según seleccione el usuario.</td>
-    </tr>
-    <tr>
-      <td><code>READ_EXTERNAL_STORAGE</code></td>
-      <td>Acceso a videos en dispositivos con Android 12 o inferior.</td>
-    </tr>
-    <tr>
-      <td><code>FOREGROUND_SERVICE</code></td>
-      <td>Permitir la reproducción de audio en segundo plano.</td>
-    </tr>
-    <tr>
-      <td><code>FOREGROUND_SERVICE_MEDIA_PLAYBACK</code></td>
-      <td>Servicio de primer plano específico para reproducción de media.</td>
-    </tr>
-    <tr>
-      <td><code>POST_NOTIFICATIONS</code></td>
-      <td>Mostrar la notificación de controls de reproducción cuando el audio se reproduce en segundo plano.</td>
-    </tr>
-  </tbody>
+<table>
+    <tr><td><strong>Nombre de la aplicación</strong></td><td>Jualix</td></tr>
+    <tr><td><strong>Package name</strong></td><td>com.puma.videomax</td></tr>
+    <tr><td><strong>Desarrollador</strong></td><td>Puma Studio</td></tr>
+    <tr><td><strong>Correo de contacto</strong></td><td>julmerpumacondori@gmail.com</td></tr>
+    <tr><td><strong>Plataforma</strong></td><td>Android (Google Play Store)</td></tr>
 </table>
 
-<h3>3. Datos que NO recopila</h3>
+<hr>
 
+<h2>2. Información que recopilamos</h2>
+
+<p>Jualix <strong>no recopila ni almacena datos personales en servidores propios</strong>. La aplicación no solicita nombre, correo electrónico, número de teléfono ni ninguna otra información de identificación personal.</p>
+
+<p>Jualix integra Google AdMob para mostrar publicidad. A través de este SDK, se pueden recopilar ciertos datos de forma automática. Ver sección 6 para más detalles.</p>
+
+<hr>
+
+<h2>3. Información almacenada localmente en el dispositivo</h2>
+
+<p>Jualix almacena datos exclusivamente en el dispositivo del usuario utilizando una base de datos local (Room) y un almacén de preferencias (DataStore). <strong>Ninguno de estos datos se envía a servidores externos.</strong></p>
+
+<h3>3.1. Información de videos</h3>
 <ul>
-  <li>Nombre, correo electrónico ni ninguna información de identificación personal.</li>
-  <li>Ubicación geográfica.</li>
-  <li>Contactos del dispositivo.</li>
-  <li>Fotos o archivos que no sean videos.</li>
-  <li>Información del dispositivo (modelo, IMEI, número de serie, etc.).</li>
-  <li>Datos de uso o analytics.</li>
-  <li>Historial de navegación web.</li>
+    <li>Identificador del video (ID del MediaStore)</li>
+    <li>URI del archivo</li>
+    <li>Nombre del archivo</li>
+    <li>Ruta del archivo en el dispositivo</li>
+    <li>Duración</li>
+    <li>Tamaño en bytes</li>
+    <li>Resolución (ancho y alto)</li>
+    <li>Formato MIME</li>
+    <li>Fecha de creación y modificación</li>
+    <li>Nombre de la carpeta contenedora</li>
+    <li>Códec del video</li>
+    <li>Si el video es favorito</li>
+    <li>Última posición de reproducción</li>
+    <li>Número de veces reproducido</li>
+    <li>Si es un video nuevo (no visto)</li>
 </ul>
 
-<h3>4. Servicios de terceros</h3>
-
-<p>VideoMax <strong>no integra</strong> ningún servicio de terceros, incluyendo pero no limitado a:</p>
-
+<h3>3.2. Información de canciones (música)</h3>
 <ul>
-  <li>Google Analytics</li>
-  <li>Google AdMob u otras redes de publicidad</li>
-  <li>Google Firebase</li>
-  <li>Redes sociales</li>
-  <li>Servicios de análisis o rastreo</li>
+    <li>Identificador de la canción (ID del MediaStore)</li>
+    <li>URI del archivo</li>
+    <li>Título, artista y álbum</li>
+    <li>Identificador del álbum</li>
+    <li>Duración, tamaño y formato MIME</li>
+    <li>Fecha de creación y modificación</li>
+    <li>Ruta y carpeta contenedora</li>
+    <li>Número de pista, disco y año</li>
+    <li>Bitrate y sample rate</li>
+    <li>Datos de ganancia de audio (track/album gain y peak)</li>
+    <li>Si la canción es favorita</li>
+    <li>Última posición de reproducción</li>
+    <li>Número de veces reproducida</li>
+    <li>Puntuación (rating) asignada por el usuario</li>
+    <li>Pista de audio seleccionada</li>
 </ul>
 
-<p>No se realizan conexiones de red de ningún tipo. La aplicación opera completamente sin conexión a internet.</p>
-
-<h3>5. Almacenamiento de datos</h3>
-
-<p>Toda la información utilizada por la app se almacena <strong>exclusivamente en el dispositivo del usuario</strong> mediante:</p>
-
+<h3>3.3. Historial de reproducción</h3>
 <ul>
-  <li><strong>Base de datos Room</strong> — Historial de reproducción, listas de reproducción, favoritos y metadatos de videos.</li>
-  <li><strong>DataStore de preferencias</strong> — Configuración de tema, velocidad, posición recordada y demás ajustes.</li>
+    <li>ID y URI del video reproducido</li>
+    <li>Nombre del archivo</li>
+    <li>Posición de reproducción (en milisegundos)</li>
+    <li>Duración total</li>
+    <li>Fecha y hora de la reproducción</li>
 </ul>
 
-<p>Estos datos se eliminan automáticamente al desinstalar la aplicación.</p>
-
-<h3>6. Datos compartidos</h3>
-
-<p>VideoMax <strong>no comparte</strong> ningún dato con terceros. No se realizan transferencias de datos dentro o fuera del dispositivo.</p>
-
-<h3>7. Seguridad</h3>
-
-<p>Al no recopilar ni transmitir datos personales, el riesgo de exposición es mínimo. Los datos almacenados localmente permanecen dentro del dispositivo y no son accesibles por la aplicación ni por terceros fuera del entorno de la app.</p>
-
-<h3>8. Privacidad de los niños</h3>
-
-<p>VideoMax no está dirigida a menores de 13 años. La app no recopila información personal de ningún usuario, independientemente de su edad.</p>
-
-<h3>9. Cambios en esta política</h3>
-
-<p>Esta política de privacidad puede actualizarse periódicamente. Cualquier cambio será publicado en esta misma página con la fecha de última actualización.</p>
-
-<h3>10. Contacto</h3>
-
-<p>Si tienes preguntas sobre esta política de privacidad, puedes contactarme a través de:</p>
-
+<h3>3.4. Listas de reproducción</h3>
 <ul>
-  <li><strong>Correo electrónico:</strong> [Tu correo electrónico]</li>
-  <li><strong>Blog:</strong> [URL de tu blog en Blogger]</li>
+    <li>Nombre de la lista</li>
+    <li>Fecha de creación</li>
+    <li>Videos incluidos en cada lista</li>
+    <li>Fecha en que cada video fue agregado</li>
+</ul>
+
+<h3>3.5. Colas de música</h3>
+<ul>
+    <li>Nombre de la cola</li>
+    <li>Fecha de creación</li>
+    <li>Si está marcada como favorita</li>
+    <li>Origen (manual u otro)</li>
+    <li>Canciones incluidas y su orden</li>
+</ul>
+
+<h3>3.6. Configuración y preferencias</h3>
+<ul>
+    <li>Modo de tema (sistema, claro, oscuro, AMOLED)</li>
+    <li>Color de acento</li>
+    <li>Opción de ordenamiento de videos y música</li>
+    <li>Velocidad de reproducción predeterminada</li>
+    <li>Recordar posición de reproducción</li>
+    <li>Reproducción automática del siguiente</li>
+    <li>Salto de búsqueda (segundos)</li>
+    <li>Mostrar archivos ocultos y .nomedia</li>
+    <li>Control por gestos activado/desactivado</li>
+    <li>Picture-in-Picture automático</li>
+    <li>Timestamp del último escaneo de biblioteca</li>
+    <li>PIN de la carpeta privada</li>
+    <li>IDs de videos en la carpeta privada</li>
+    <li>Aceptación de términos de servicio</li>
+</ul>
+
+<h3>3.7. Thumbnails en caché</h3>
+<ul>
+    <li>Imágenes en miniatura de videos almacenadas en caché del disco (hasta 100 MB)</li>
 </ul>
 
 <hr>
 
-<p><em>Esta política de privacidad es aplicable únicamente a la aplicación VideoMax, disponible en Google Play Store.</em></p>
+<h2>4. Información recopilada automáticamente</h2>
+
+<p>Jualix no recopila datos de uso, analytics ni estadísticas de forma propia. No se utilizan herramientas de Google Analytics, Firebase ni ningún otro servicio de análisis.</p>
+
+<p>El SDK de Google AdMob puede recopilar automáticamente cierta información. Ver sección 6.</p>
+
+<hr>
+
+<h2>5. Advertising ID</h2>
+
+<p>Jualix utiliza el Advertising ID proporcionado por Google Play Services. Este identificador es gestionado por el SDK de Google Mobile Ads (AdMob) y no es recopilado directamente por la aplicación.</p>
+
+<p>El Advertising ID es un identificador opaco que permite a los proveedores de publicidad ofrecer anuncios más relevantes. Los usuarios pueden restablecer o desactivar el Advertising ID desde la configuración de su dispositivo en cualquier momento (Ajustes > Privacidad > Anuncios).</p>
+
+<p>Jualix no utiliza el Advertising ID para ningún fin diferente a la publicidad gestionada por Google AdMob.</p>
+
+<hr>
+
+<h2>6. Google AdMob y publicidad</h2>
+
+<p>Jualix utiliza <strong>Google AdMob</strong> (proveedor: Google LLC) para mostrar publicidad dentro de la aplicación. AdMob es un servicio de publicidad para aplicaciones móviles que forma parte de Google LLC.</p>
+
+<h3>6.1. Tipos de anuncios</h3>
+<ul>
+    <li><strong>Anuncios de banner:</strong> Se muestran en la parte inferior de algunas pantallas de la aplicación.</li>
+    <li><strong>Anuncios intersticiales:</strong> Se muestran en momentos de transición entre pantallas.</li>
+    <li><strong>Anuncios recompensados:</strong> Se muestran de forma voluntaria en la sección "Apoya al desarrollador". El usuario elige si desea ver el anuncio para apoyar el desarrollo de la aplicación.</li>
+</ul>
+
+<h3>6.2. Información que puede procesar Google AdMob</h3>
+
+<p>A través del SDK de Google Mobile Ads, Google y sus socios publicitarios pueden procesar la siguiente información:</p>
+
+<ul>
+    <li><strong>Advertising ID:</strong> Identificador de publicidad del dispositivo (los usuarios pueden restablecerlo o desactivarlo en la configuración del dispositivo).</li>
+    <li><strong>Información del dispositivo:</strong> Modelo del dispositivo, versión del sistema operativo, orientación de pantalla, nivel de batería, estado de carga, idioma del sistema, zona horaria.</li>
+    <li><strong>Información de red:</strong> Tipo de conexión a internet (WiFi, datos móviles).</li>
+    <li><strong>Identificadores de aplicación:</strong> Nombre de la aplicación y versión.</li>
+    <li><strong>Información de interacción con anuncios:</strong> Impresiones, clics, aperturas y cierres de anuncios.</li>
+</ul>
+
+<p>Esta información es procesada por Google de acuerdo con la <a href="https://policies.google.com/privacy" target="_blank">Política de Privacidad de Google</a> y la <a href="https://policies.google.com/technologies/ads" target="_blank">Política de Publicidad de Google</a>.</p>
+
+<h3>6.3. Consentimiento del usuario (UMP)</h3>
+
+<p>Jualix integra la plataforma User Messaging Platform (UMP) de Google para gestionar el consentimiento del usuario en relación con la publicidad personalizada, en cumplimiento con el Reglamento General de Protección de Datos (GDPR) y otras regulaciones aplicables. Al iniciar la aplicación por primera vez, se solicita al usuario su consentimiento para la personalización de anuncios.</p>
+
+<h3>6.4. Control del usuario</h3>
+
+<p>Los usuarios pueden:</p>
+<ul>
+    <li>Otorgar o denegar el consentimiento para la publicidad personalizada al iniciar la aplicación.</li>
+    <li>Cambiar su preferencia de consentimiento en cualquier momento desde la sección de Configuración de la aplicación.</li>
+    <li>Restablecer o desactivar el Advertising ID desde la configuración del dispositivo.</li>
+    <li>Optar por anuncios no personalizados desde la configuración del dispositivo.</li>
+</ul>
+
+<hr>
+
+<h2>7. Uso de la información</h2>
+
+<p>Los datos almacenados localmente se utilizan exclusivamente para el funcionamiento de la aplicación:</p>
+
+<ul>
+    <li><strong>Información de videos y música:</strong> Para escanear, listar, buscar y mostrar la biblioteca multimedia del usuario.</li>
+    <li><strong>Historial de reproducción:</strong> Para permitir al usuario retomar la reproducción desde donde la dejó.</li>
+    <li><strong>Favoritos y puntuaciones:</strong> Para marcar y filtrar contenido preferido.</li>
+    <li><strong>Listas de reproducción y colas de música:</strong> Para organizar el contenido del usuario.</li>
+    <li><strong>Configuración:</strong> Para personalizar la experiencia de uso (tema, velocidad, gestos, etc.).</li>
+    <li><strong>Carpeta privada:</strong> Para ocultar videos específicos detrás de un PIN de acceso.</li>
+    <li><strong>Thumbnails en caché:</strong> Para mostrar imágenes en miniatura de los videos de forma rápida.</li>
+</ul>
+
+<p>La información procesada por Google AdMob se utiliza únicamente para la publicidad gestionada por Google.</p>
+
+<hr>
+
+<h2>8. Servicios de terceros</h2>
+
+<p>Jualix integra los siguientes servicios de terceros:</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>Servicio</th>
+            <th>Proveedor</th>
+            <th>Propósito</th>
+            <th>Política de privacidad</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Google Mobile Ads (AdMob)</td>
+            <td>Google LLC</td>
+            <td>Publicidad</td>
+            <td><a href="https://policies.google.com/privacy" target="_blank">Política de Privacidad de Google</a></td>
+        </tr>
+        <tr>
+            <td>User Messaging Platform (UMP)</td>
+            <td>Google LLC</td>
+            <td>Gestión de consentimiento publicitario (GDPR)</td>
+            <td><a href="https://policies.google.com/privacy" target="_blank">Política de Privacidad de Google</a></td>
+        </tr>
+    </tbody>
+</table>
+
+<p>Jualix <strong>no utiliza</strong> los siguientes servicios:</p>
+<ul>
+    <li>Firebase (Analytics, Crashlytics, Remote Config, ni ningún otro servicio Firebase)</li>
+    <li>Google Analytics</li>
+    <li>Otras redes publicitarias además de Google AdMob</li>
+    <li>Redes sociales (Facebook SDK, Twitter Kit, etc.)</li>
+    <li>Servicios de análisis o rastreo de terceros</li>
+    <li>Servidores propios</li>
+</ul>
+
+<hr>
+
+<h2>9. Compartición de información</h2>
+
+<p>Jualix <strong>no vende, alquila ni comparte</strong> los datos personales del usuario con terceros, excepto en los siguientes casos:</p>
+
+<ul>
+    <li><strong>Google AdMob:</strong> El SDK de Google Mobile Ads procesa cierta información del dispositivo y del usuario de forma independiente, de acuerdo con la política de privacidad de Google. Esta información no es controlada por Jualix.</li>
+</ul>
+
+<p>Los datos almacenados localmente (base de datos Room y preferencias DataStore) <strong>no se envían, sincronizan ni comparten</strong> con ningún servidor o servicio externo.</p>
+
+<hr>
+
+<h2>10. Permisos de la aplicación</h2>
+
+<p>Jualix solicita los siguientes permisos:</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>Permiso</th>
+            <th>Propósito</th>
+            <th>Necesario</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>READ_MEDIA_VIDEO</code></td>
+            <td>Acceder a los archivos de video del dispositivo para mostrarlos en la biblioteca y reproducirlos.</td>
+            <td>Sí (Android 13+)</td>
+        </tr>
+        <tr>
+            <td><code>READ_MEDIA_AUDIO</code></td>
+            <td>Acceder a los archivos de música del dispositivo para mostrarlos en la biblioteca y reproducirlos.</td>
+            <td>Sí (Android 13+)</td>
+        </tr>
+        <tr>
+            <td><code>READ_MEDIA_VISUAL_USER_SELECTED</code></td>
+            <td>Permitir acceso parcial a videos, según seleccione el usuario (Android 14+).</td>
+            <td>Opcional (Android 14+)</td>
+        </tr>
+        <tr>
+            <td><code>READ_EXTERNAL_STORAGE</code></td>
+            <td>Acceder a archivos multimedia en dispositivos con Android 12 o inferior.</td>
+            <td>Sí (Android ≤12)</td>
+        </tr>
+        <tr>
+            <td><code>FOREGROUND_SERVICE</code></td>
+            <td>Permitir la reproducción de audio en segundo plano.</td>
+            <td>Sí</td>
+        </tr>
+        <tr>
+            <td><code>FOREGROUND_SERVICE_MEDIA_PLAYBACK</code></td>
+            <td>Servicio de primer plano específico para reproducción de audio/video.</td>
+            <td>Sí</td>
+        </tr>
+        <tr>
+            <td><code>POST_NOTIFICATIONS</code></td>
+            <td>Mostrar la notificación de controles de reproducción cuando el audio se reproduce en segundo plano.</td>
+            <td>Sí (Android 13+)</td>
+        </tr>
+    </tbody>
+</table>
+
+<p><strong>Nota:</strong> El SDK de Google AdMob declara permisos adicionales de forma automática a través de su propio archivo de manifiesto, incluyendo <code>INTERNET</code> y <code>ACCESS_NETWORK_STATE</code>, que son necesarios para cargar y mostrar anuncios.</p>
+
+<hr>
+
+<h2>11. Conservación y eliminación de datos</h2>
+
+<h3>11.1. Conservación</h3>
+<p>Todos los datos se almacenan exclusivamente en el dispositivo del usuario y se conservan mientras la aplicación esté instalada.</p>
+
+<h3>11.2. Eliminación por el usuario</h3>
+<p>El usuario puede eliminar los datos de la aplicación de las siguientes maneras:</p>
+<ul>
+    <li><strong>Carpeta privada:</strong> Los videos ocultos en la carpeta privada pueden ser removidos de la carpeta privada desde la configuración de la aplicación.</li>
+    <li><strong>Listas de reproducción:</strong> El usuario puede eliminar listas de reproducción individuales desde la sección de listas.</li>
+    <li><strong>Historial:</strong> El historial de reproducción se mantiene localmente y se actualiza automáticamente.</li>
+    <li><strong>Desinstalación:</strong> Al desinstalar la aplicación, todos los datos almacenados localmente (base de datos, preferencias y caché de thumbnails) se eliminan automáticamente del dispositivo.</li>
+</ul>
+
+<h3>11.3. Sin cuenta de usuario</h3>
+<p>Jualix no utiliza cuentas de usuario ni servidores propios. No existe un sistema de registro, inicio de sesión ni eliminación de cuenta.</p>
+
+<hr>
+
+<h2>12. Seguridad</h2>
+
+<p>Jualix toma medidas para proteger la información del usuario:</p>
+<ul>
+    <li>Todos los datos se almacenan localmente en el dispositivo y no se transmiten a servidores externos (con excepción de los datos procesados por Google AdMob).</li>
+    <li>La carpeta privada está protegida con un PIN numérico definido por el usuario.</li>
+    <li>No se recopila ni almacena información sensible como credenciales, números de identificación ni datos financieros.</li>
+</ul>
+
+<hr>
+
+<h2>13. Privacidad de menores</h2>
+
+<p>Jualix no está dirigida específicamente a menores de 13 años (o la edad mínima aplicable en la jurisdicción del usuario). La aplicación no recopila información personal de ningún usuario, independientemente de su edad.</p>
+
+<p>Si se descubre que un menor de 13 años ha proporcionado información personal a través del uso de la aplicación, se tomarán medidas para eliminar dicha información.</p>
+
+<hr>
+
+<h2>14. Derechos del usuario</h2>
+
+<p>De acuerdo con el Reglamento General de Protección de Datos (GDPR) y otras leyes de protección de datos aplicables, los usuarios tienen los siguientes derechos:</p>
+
+<ul>
+    <li><strong>Derecho de acceso:</strong> Los usuarios pueden revisar toda la información almacenada localmente en la aplicación (videos, música, historial, listas, configuración).</li>
+    <li><strong>Derecho de eliminación:</strong> Los usuarios pueden eliminar datos específicos (listas de reproducción, videos de la carpeta privada) o eliminar todos los datos desinstalando la aplicación.</li>
+    <li><strong>Derecho de oposición al perfilado:</strong> Los usuarios pueden rechazar la publicidad personalizada otorgando o denegando el consentimiento a través de la plataforma UMP al iniciar la aplicación, o cambiando su preferencia desde la configuración.</li>
+    <li><strong>Derecho de portabilidad:</strong> Los datos se almacenan localmente en el dispositivo y pueden ser exportados mediante copias de seguridad del sistema si la función de backup está habilitada.</li>
+</ul>
+
+<hr>
+
+<h2>15. Cambios en esta política</h2>
+
+<p>Esta política de privacidad puede actualizarse periódicamente. Cualquier cambio será publicado en esta misma página con la fecha de la última actualización. Se recomienda revisar esta política de forma periódica.</p>
+
+<hr>
+
+<h2>16. Contacto</h2>
+
+<p>Si tienes preguntas, inquietudes o solicitudes relacionadas con esta política de privacidad o con el tratamiento de tus datos, puedes contactarnos a través de:</p>
+
+<ul>
+    <li><strong>Correo electrónico:</strong> julmerpumacondori@gmail.com</li>
+</ul>
+
+<hr>
+
+<p><em>Esta política de privacidad es aplicable únicamente a la aplicación Jualix (com.puma.videomax), disponible en Google Play Store.</em></p>
+
+</body>
+</html>

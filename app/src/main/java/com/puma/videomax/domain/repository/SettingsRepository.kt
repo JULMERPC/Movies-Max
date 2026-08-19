@@ -23,4 +23,5 @@ interface SettingsRepository {
 	suspend fun setLastScanTimestamp(timestamp: Long)
 	suspend fun setPrivateFolderPin(pin: String?)
 	suspend fun setPrivateVideoIds(ids: List<Long>)
+	suspend fun setTermsAccepted(accepted: Boolean)
 }

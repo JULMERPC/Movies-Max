@@ -43,18 +43,22 @@ object BackgroundAudioManager {
 	private var autoPlayNext = false
 	private var onTrackChange: ((AudioQueueItem) -> Unit)? = null
 	private var onPlayPauseChange: ((Boolean) -> Unit)? = null
+	private var onSeekRequest: ((Long) -> Unit)? = null
 
 	fun registerCallbacks(
 		onTrackChange: (AudioQueueItem) -> Unit,
-		onPlayPauseChange: (Boolean) -> Unit
+		onPlayPauseChange: (Boolean) -> Unit,
+		onSeekRequest: (Long) -> Unit = {}
 	) {
 		this.onTrackChange = onTrackChange
 		this.onPlayPauseChange = onPlayPauseChange
+		this.onSeekRequest = onSeekRequest
 	}
 
 	fun unregisterCallbacks() {
 		onTrackChange = null
 		onPlayPauseChange = null
+		onSeekRequest = null
 	}
 
 	fun current(): AudioQueueItem? {
@@ -91,6 +95,11 @@ object BackgroundAudioManager {
 
 	fun setDuration(ms: Long) {
 		_duration.value = ms
+	}
+
+	fun seekTo(positionMs: Long) {
+		_currentPosition.value = positionMs
+		onSeekRequest?.invoke(positionMs)
 	}
 
 	fun cycleRepeatMode() {
@@ -157,12 +166,16 @@ object BackgroundAudioManager {
 
 	fun userNext() {
 		val item = next() ?: return
+		_currentPosition.value = 0L
+		_duration.value = 0L
 		_isPlaying.value = true
 		onTrackChange?.invoke(item)
 	}
 
 	fun userPrevious() {
 		val item = previous() ?: return
+		_currentPosition.value = 0L
+		_duration.value = 0L
 		_isPlaying.value = true
 		onTrackChange?.invoke(item)
 	}

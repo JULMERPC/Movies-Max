@@ -5,6 +5,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -33,6 +34,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.puma.videomax.ads.BannerAd
 import com.puma.videomax.presentation.details.DetailsScreen
 import com.puma.videomax.presentation.library.LibraryScreen
 import com.puma.videomax.presentation.music.MiniPlayer
@@ -43,6 +45,7 @@ import com.puma.videomax.presentation.playlists.PlaylistsScreen
 import com.puma.videomax.presentation.playlists.SmartCollectionScreen
 import com.puma.videomax.presentation.settings.PrivateFolderScreen
 import com.puma.videomax.presentation.settings.SettingsScreen
+import com.puma.videomax.presentation.settings.SupportDeveloperScreen
 import com.puma.videomax.presentation.theme.VideoMaxDimens
 import com.puma.videomax.service.BackgroundAudioManager
 import com.puma.videomax.service.BackgroundAudioService
@@ -78,22 +81,25 @@ fun VideoPlayerNavHost() {
 		Scaffold(
 			bottomBar = {
 				if (showNav && !isWideScreen) {
-					NavigationBar {
-						items.forEach { item ->
-							NavigationBarItem(
-								selected = currentRoute == item.screen.route,
-								onClick = {
-									navController.navigate(item.screen.route) {
-										popUpTo(navController.graph.findStartDestination().id) {
-											saveState = true
+					Column {
+						BannerAd()
+						NavigationBar {
+							items.forEach { item ->
+								NavigationBarItem(
+									selected = currentRoute == item.screen.route,
+									onClick = {
+										navController.navigate(item.screen.route) {
+											popUpTo(navController.graph.findStartDestination().id) {
+												saveState = true
+											}
+											launchSingleTop = true
+											restoreState = true
 										}
-										launchSingleTop = true
-										restoreState = true
-									}
-								},
-								icon = { Icon(item.icon, contentDescription = item.label) },
-								label = { Text(item.label) }
-							)
+									},
+									icon = { Icon(item.icon, contentDescription = item.label) },
+									label = { Text(item.label) }
+								)
+							}
 						}
 					}
 				}
@@ -154,11 +160,19 @@ fun VideoPlayerNavHost() {
 						SettingsScreen(
 							onOpenPrivateFolder = {
 								navController.navigate(Screen.PrivateFolder.route)
+							},
+							onOpenSupportDeveloper = {
+								navController.navigate(Screen.SupportDeveloper.route)
 							}
 						)
 					}
 					composable(Screen.PrivateFolder.route) {
 						PrivateFolderScreen(
+							onBack = { navController.popBackStack() }
+						)
+					}
+					composable(Screen.SupportDeveloper.route) {
+						SupportDeveloperScreen(
 							onBack = { navController.popBackStack() }
 						)
 					}

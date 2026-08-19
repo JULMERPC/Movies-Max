@@ -3,6 +3,7 @@ package com.puma.videomax.presentation.favorites
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -17,9 +18,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -67,33 +70,33 @@ fun FavoritesScreen(
 ) {
 	val favorites by viewModel.favorites.collectAsStateWithLifecycle()
 
-	Scaffold(
-		containerColor = Color.Transparent,
-		topBar = {
+	Box(
+		modifier = Modifier
+			.fillMaxSize()
+			.background(screenGradient())
+	) {
+		Column(modifier = Modifier.fillMaxSize()) {
 			TopAppBar(
-				title = { Text("Favoritos", color = VideoMaxTheme.extended.textPrimary) },
+				title = {
+					Text(
+						"Favoritos",
+						style = MaterialTheme.typography.headlineSmall,
+						fontWeight = FontWeight.Bold,
+						color = VideoMaxTheme.extended.textPrimary
+					)
+				},
 				colors = TopAppBarDefaults.topAppBarColors(
-					containerColor = Color(
-						MaterialTheme.colorScheme.primary.red,
-						MaterialTheme.colorScheme.primary.green,
-						MaterialTheme.colorScheme.primary.blue,
-						0.10f
-					).compositeOver(MaterialTheme.colorScheme.surface)
+					containerColor = Color.Transparent
 				)
 			)
-		}
-	) { padding ->
-		Box(
-			modifier = Modifier
-				.fillMaxSize()
-				.background(screenGradient())
-				.padding(padding)
-		) {
+
 			if (favorites.isEmpty()) {
-				EmptyState(
-					title = "Sin favoritos",
-					subtitle = "Tocá el corazón en cualquier video para fijarlo acá."
-				)
+				Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+					EmptyState(
+						title = "Sin favoritos",
+						subtitle = "Tocá el corazón en cualquier video para fijarlo acá."
+					)
+				}
 			} else {
 				LazyVerticalGrid(
 					columns = GridCells.Adaptive(168.dp),

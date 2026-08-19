@@ -1,11 +1,17 @@
 package com.puma.videomax.presentation.settings
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -14,22 +20,33 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Gesture
 import androidx.compose.material.icons.filled.HideImage
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PictureInPictureAlt
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -37,13 +54,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -56,13 +72,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.activity.compose.LocalActivity
 import com.puma.videomax.R
+import com.puma.videomax.ads.LocalConsentManager
 import com.puma.videomax.domain.model.ThemeMode
 import com.puma.videomax.util.Formatters
 import com.puma.videomax.presentation.theme.VideoMaxDimens
@@ -73,159 +91,337 @@ import com.puma.videomax.presentation.theme.screenGradient
 @Composable
 fun SettingsScreen(
 	viewModel: SettingsViewModel = hiltViewModel(),
-	onOpenPrivateFolder: () -> Unit = {}
+	onOpenPrivateFolder: () -> Unit = {},
+	onOpenSupportDeveloper: () -> Unit = {}
 ) {
 	val settings by viewModel.settings.collectAsStateWithLifecycle()
+	val consentManager = LocalConsentManager.current
+	val activity = LocalActivity.current
 
-	val gradient = screenGradient()
-
-	Scaffold(
-		containerColor = Color.Transparent,
-		topBar = {
-	TopAppBar(
-			title = { Text(stringResource(R.string.settings_title), color = VideoMaxTheme.extended.textPrimary) },
-			colors = TopAppBarDefaults.topAppBarColors(
-				containerColor = Color(
-					MaterialTheme.colorScheme.primary.red,
-					MaterialTheme.colorScheme.primary.green,
-					MaterialTheme.colorScheme.primary.blue,
-					0.10f
-				).compositeOver(MaterialTheme.colorScheme.surface),
-				titleContentColor = MaterialTheme.colorScheme.onSurface
+	Box(
+		modifier = Modifier
+			.fillMaxSize()
+			.background(screenGradient())
+	) {
+		Column(modifier = Modifier.fillMaxSize()) {
+			TopAppBar(
+				title = {
+					Text(
+						stringResource(R.string.settings_title),
+						style = MaterialTheme.typography.headlineSmall,
+						fontWeight = FontWeight.Bold,
+						color = VideoMaxTheme.extended.textPrimary
+					)
+				},
+				colors = TopAppBarDefaults.topAppBarColors(
+					containerColor = Color.Transparent
+				)
 			)
-		)
-		}
-	) { padding ->
-		Box(
-			modifier = Modifier
-				.fillMaxSize()
-				.background(gradient)
-				.padding(padding)
-		) {
+
 			Column(
 				modifier = Modifier
 					.fillMaxSize()
 					.verticalScroll(rememberScrollState())
-					.padding(horizontal = VideoMaxDimens.spacingLg, vertical = VideoMaxDimens.spacingSm),
-				verticalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingLg)
+					.padding(horizontal = VideoMaxDimens.spacingLg),
+				verticalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingMd)
 			) {
-			GlassSection(title = stringResource(R.string.settings_appearance)) {
-				ThemeDropdown(
-					selected = settings.themeMode,
-					onSelected = viewModel::setTheme
-				)
-				Spacer(modifier = Modifier.height(VideoMaxDimens.spacingSm))
-				ColorPickerRow(
-					selectedColor = settings.accentColor,
-					onColorSelected = viewModel::setAccentColor
-				)
-			}
+				Spacer(modifier = Modifier.height(VideoMaxDimens.spacingXs))
 
-				GlassSection(title = stringResource(R.string.settings_playback)) {
-					GlassSwitchRow(
+				SettingsCard(
+					title = "Apoya al desarrollador",
+					icon = Icons.Default.Favorite
+				) {
+					SettingsClickableRow(
+						title = "Apoya el desarrollo de Jualix",
+						subtitle = "Viendo un anuncio voluntario",
+						icon = Icons.Default.Favorite,
+						onClick = onOpenSupportDeveloper
+					)
+				}
+
+				SettingsCard(
+					title = stringResource(R.string.settings_appearance),
+					icon = Icons.Default.Gesture
+				) {
+					ThemeDropdown(
+						selected = settings.themeMode,
+						onSelected = viewModel::setTheme
+					)
+					Spacer(modifier = Modifier.height(VideoMaxDimens.spacingSm))
+					ColorPickerRow(
+						selectedColor = settings.accentColor,
+						onColorSelected = viewModel::setAccentColor
+					)
+				}
+
+				SettingsCard(
+					title = stringResource(R.string.settings_playback),
+					icon = Icons.Default.Speed
+				) {
+					SettingsSwitchRow(
 						title = stringResource(R.string.settings_remember_position),
 						checked = settings.rememberPlaybackPosition,
 						onCheckedChange = viewModel::setRememberPosition
 					)
-					GlassSwitchRow(
+					SettingsSwitchRow(
 						title = stringResource(R.string.settings_autoplay_next),
 						checked = settings.autoPlayNext,
 						onCheckedChange = viewModel::setAutoPlayNext
 					)
-					Text(
-						text = stringResource(
-							R.string.settings_speed,
-							Formatters.formatSpeed(settings.defaultPlaybackSpeed)
-						),
-						style = MaterialTheme.typography.bodyMedium,
-						color = VideoMaxTheme.extended.textPrimary
-					)
-					Slider(
+					Spacer(modifier = Modifier.height(VideoMaxDimens.spacingSm))
+					SettingsSliderRow(
+						label = stringResource(R.string.settings_speed, Formatters.formatSpeed(settings.defaultPlaybackSpeed)),
 						value = settings.defaultPlaybackSpeed,
-						onValueChange = viewModel::setSpeed,
 						valueRange = 0.25f..2.5f,
 						steps = 8,
-						colors = SliderDefaults.colors(
-							thumbColor = MaterialTheme.colorScheme.primary,
-							activeTrackColor = MaterialTheme.colorScheme.primary,
-							inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHigh
-						)
+						onValueChange = viewModel::setSpeed
 					)
-					Text(
-						text = stringResource(R.string.settings_seek_step, settings.seekStepSeconds),
-						style = MaterialTheme.typography.bodyMedium,
-						color = VideoMaxTheme.extended.textPrimary
-					)
-					Slider(
+					SettingsSliderRow(
+						label = stringResource(R.string.settings_seek_step, settings.seekStepSeconds),
 						value = settings.seekStepSeconds.toFloat(),
-						onValueChange = { viewModel.setSeekStep(it.toInt()) },
 						valueRange = 5f..30f,
 						steps = 4,
-						colors = SliderDefaults.colors(
-							thumbColor = MaterialTheme.colorScheme.primary,
-							activeTrackColor = MaterialTheme.colorScheme.primary,
-							inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHigh
-						)
+						onValueChange = { viewModel.setSeekStep(it.toInt()) }
 					)
 				}
 
-				GlassSection(title = stringResource(R.string.settings_player), icon = Icons.Default.Gesture) {
-					GlassSwitchRow(
+				SettingsCard(
+					title = stringResource(R.string.settings_player),
+					icon = Icons.Default.Gesture
+				) {
+					SettingsSwitchRow(
 						title = stringResource(R.string.settings_gestures),
 						subtitle = stringResource(R.string.settings_gestures_desc),
-						icon = Icons.Default.Gesture,
 						checked = settings.gesturesEnabled,
 						onCheckedChange = viewModel::setGesturesEnabled
 					)
-					GlassSwitchRow(
+					SettingsSwitchRow(
 						title = stringResource(R.string.settings_auto_pip),
 						subtitle = stringResource(R.string.settings_auto_pip_desc),
-						icon = Icons.Default.PictureInPictureAlt,
 						checked = settings.autoPip,
 						onCheckedChange = viewModel::setAutoPip
 					)
 				}
 
-				GlassSection(title = "Archivos", icon = Icons.Default.Folder) {
-					GlassSwitchRow(
+				SettingsCard(
+					title = "Archivos",
+					icon = Icons.Default.Folder
+				) {
+					SettingsSwitchRow(
 						title = "Mostrar archivos .nomedia",
 						subtitle = "Incluir carpetas marcadas con .nomedia",
-						icon = Icons.Default.HideImage,
 						checked = settings.showNomedia,
 						onCheckedChange = viewModel::setShowNomedia
 					)
-					GlassSwitchRow(
+					SettingsSwitchRow(
 						title = "Mostrar archivos ocultos",
 						subtitle = "Incluir archivos y carpetas ocultos",
-						icon = Icons.Default.Visibility,
 						checked = settings.showHiddenFiles,
 						onCheckedChange = viewModel::setShowHiddenFiles
 					)
 				}
 
-				GlassSection(title = "Carpeta privada", icon = Icons.Default.Lock) {
-					GlassSwitchRow(
-						title = if (settings.privateFolderPin != null) "Carpeta privada activa" else "Configurar carpeta privada",
-						subtitle = if (settings.privateFolderPin != null) "${settings.privateVideoIds.size} videos protegidos" else "Proteger videos con PIN de 4 dígitos",
-						icon = Icons.Default.Lock,
-						checked = false,
-						isToggle = false,
-						onClick = onOpenPrivateFolder
-					)
+			SettingsCard(
+				title = "Carpeta privada",
+				icon = Icons.Default.Lock
+			) {
+				SettingsClickableRow(
+					title = if (settings.privateFolderPin != null) "Carpeta privada activa" else "Configurar carpeta privada",
+					subtitle = if (settings.privateFolderPin != null) "${settings.privateVideoIds.size} videos protegidos" else "Proteger videos con PIN de 4 dígitos",
+					icon = Icons.Default.Lock,
+					onClick = onOpenPrivateFolder
+				)
+			}
+
+			SettingsCard(
+				title = "Privacidad",
+				icon = Icons.Default.Lock
+			) {
+				SettingsClickableRow(
+					title = "Configuración de privacidad",
+					subtitle = "Administrar tus preferencias de consentimiento",
+					icon = Icons.Default.Lock,
+					onClick = { activity?.let { consentManager.showPrivacyOptionsForm(it) } }
+				)
+			}
+
+			SettingsCard(
+				title = stringResource(R.string.settings_about),
+					icon = Icons.Default.Info
+				) {
+					Row(
+						modifier = Modifier.fillMaxWidth(),
+						verticalAlignment = Alignment.CenterVertically
+					) {
+						Column(modifier = Modifier.weight(1f)) {
+							Text(
+								"Jualix",
+								style = MaterialTheme.typography.titleMedium,
+								color = VideoMaxTheme.extended.textPrimary
+							)
+							Text(
+								text = stringResource(R.string.settings_about_desc),
+								style = MaterialTheme.typography.bodySmall,
+								color = VideoMaxTheme.extended.textTertiary
+							)
+						}
+					}
 				}
 
-				GlassSection(title = stringResource(R.string.settings_about)) {
-					Text("videomax", style = MaterialTheme.typography.titleMedium, color = VideoMaxTheme.extended.textPrimary)
-					Text(
-						text = stringResource(R.string.settings_about_desc),
-						style = MaterialTheme.typography.bodyMedium,
-						color = VideoMaxTheme.extended.textTertiary
-					)
-				}
-
-				Spacer(modifier = Modifier.height(VideoMaxDimens.spacingXxl))
+				Spacer(modifier = Modifier.height(VideoMaxDimens.spacingXxxl))
 			}
 		}
+	}
+}
+
+@Composable
+private fun SettingsCard(
+	title: String,
+	icon: ImageVector,
+	content: @Composable () -> Unit
+) {
+	Card(
+		modifier = Modifier.fillMaxWidth(),
+		shape = RoundedCornerShape(VideoMaxDimens.radiusLg),
+		colors = CardDefaults.cardColors(
+			containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
+		),
+		elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+	) {
+		Column(
+			modifier = Modifier.padding(VideoMaxDimens.spacingLg)
+		) {
+			Row(
+				verticalAlignment = Alignment.CenterVertically,
+				modifier = Modifier.padding(bottom = VideoMaxDimens.spacingMd)
+			) {
+				Icon(
+					imageVector = icon,
+					contentDescription = null,
+					tint = MaterialTheme.colorScheme.primary,
+					modifier = Modifier.size(20.dp)
+				)
+				Spacer(modifier = Modifier.width(VideoMaxDimens.spacingSm))
+				Text(
+					text = title,
+					style = MaterialTheme.typography.titleSmall,
+					fontWeight = FontWeight.SemiBold,
+					color = MaterialTheme.colorScheme.primary
+				)
+			}
+			content()
+		}
+	}
+}
+
+@Composable
+private fun SettingsSwitchRow(
+	title: String,
+	subtitle: String? = null,
+	checked: Boolean = false,
+	onCheckedChange: ((Boolean) -> Unit)? = null
+) {
+	Row(
+		modifier = Modifier
+			.fillMaxWidth()
+			.padding(vertical = VideoMaxDimens.spacingXs),
+		verticalAlignment = Alignment.CenterVertically
+	) {
+		Column(modifier = Modifier.weight(1f)) {
+			Text(
+				title,
+				style = MaterialTheme.typography.bodyLarge,
+				color = VideoMaxTheme.extended.textPrimary
+			)
+			if (subtitle != null) {
+				Text(
+					subtitle,
+					style = MaterialTheme.typography.bodySmall,
+					color = VideoMaxTheme.extended.textTertiary
+				)
+			}
+		}
+		Switch(
+			checked = checked,
+			onCheckedChange = onCheckedChange ?: {},
+			colors = SwitchDefaults.colors(
+				checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+				checkedTrackColor = MaterialTheme.colorScheme.primary
+			)
+		)
+	}
+}
+
+@Composable
+private fun SettingsClickableRow(
+	title: String,
+	subtitle: String? = null,
+	icon: ImageVector,
+	onClick: () -> Unit
+) {
+	Row(
+		modifier = Modifier
+			.fillMaxWidth()
+			.clip(RoundedCornerShape(VideoMaxDimens.radiusMd))
+			.clickable(onClick = onClick)
+			.padding(vertical = VideoMaxDimens.spacingSm, horizontal = VideoMaxDimens.spacingXs),
+		verticalAlignment = Alignment.CenterVertically
+	) {
+		Icon(
+			imageVector = icon,
+			contentDescription = null,
+			tint = MaterialTheme.colorScheme.primary,
+			modifier = Modifier.size(20.dp)
+		)
+		Spacer(modifier = Modifier.width(VideoMaxDimens.spacingMd))
+		Column(modifier = Modifier.weight(1f)) {
+			Text(
+				title,
+				style = MaterialTheme.typography.bodyLarge,
+				color = VideoMaxTheme.extended.textPrimary
+			)
+			if (subtitle != null) {
+				Text(
+					subtitle,
+					style = MaterialTheme.typography.bodySmall,
+					color = VideoMaxTheme.extended.textTertiary
+				)
+			}
+		}
+		Icon(
+			imageVector = Icons.Default.ChevronRight,
+			contentDescription = null,
+			tint = VideoMaxTheme.extended.textTertiary,
+			modifier = Modifier.size(20.dp)
+		)
+	}
+}
+
+@Composable
+private fun SettingsSliderRow(
+	label: String,
+	value: Float,
+	valueRange: ClosedFloatingPointRange<Float>,
+	steps: Int,
+	onValueChange: (Float) -> Unit
+) {
+	Column(modifier = Modifier.padding(vertical = VideoMaxDimens.spacingXs)) {
+		Text(
+			text = label,
+			style = MaterialTheme.typography.bodyMedium,
+			color = VideoMaxTheme.extended.textPrimary
+		)
+		Slider(
+			value = value,
+			onValueChange = onValueChange,
+			valueRange = valueRange,
+			steps = steps,
+			colors = SliderDefaults.colors(
+				thumbColor = MaterialTheme.colorScheme.primary,
+				activeTrackColor = MaterialTheme.colorScheme.primary,
+				inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+			)
+		)
 	}
 }
 
@@ -257,6 +453,7 @@ private fun ThemeDropdown(
 			modifier = Modifier
 				.fillMaxWidth()
 				.menuAnchor(MenuAnchorType.PrimaryNotEditable),
+			shape = RoundedCornerShape(VideoMaxDimens.radiusMd),
 			colors = OutlinedTextFieldDefaults.colors(
 				unfocusedTextColor = VideoMaxTheme.extended.textPrimary,
 				focusedTextColor = VideoMaxTheme.extended.textPrimary
@@ -265,7 +462,7 @@ private fun ThemeDropdown(
 		ExposedDropdownMenu(
 			expanded = expanded,
 			onDismissRequest = { expanded = false },
-			shape = RoundedCornerShape(16.dp),
+			shape = RoundedCornerShape(VideoMaxDimens.radiusMd),
 			containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
 		) {
 			ThemeMode.entries.forEach { mode ->
@@ -294,107 +491,6 @@ private fun ThemeDropdown(
 }
 
 @Composable
-private fun GlassSection(
-	title: String,
-	icon: ImageVector? = null,
-	content: @Composable () -> Unit
-) {
-	Surface(
-		modifier = Modifier
-			.fillMaxWidth()
-			.clip(RoundedCornerShape(VideoMaxDimens.radiusXl))
-			.border(
-				width = 1.dp,
-				brush = Brush.linearGradient(
-					listOf(
-						Color.White.copy(alpha = 0.12f),
-						MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-					)
-				),
-				shape = RoundedCornerShape(VideoMaxDimens.radiusXl)
-			),
-		color = MaterialTheme.colorScheme.surface.copy(alpha = VideoMaxDimens.alphaSurfaceGlassHover),
-		tonalElevation = VideoMaxDimens.elevationNone,
-		shadowElevation = VideoMaxDimens.elevationNone,
-		shape = RoundedCornerShape(VideoMaxDimens.radiusXl)
-	) {
-		Column(modifier = Modifier.padding(VideoMaxDimens.spacingLg)) {
-			Row(verticalAlignment = Alignment.CenterVertically) {
-				if (icon != null) {
-					Icon(
-						imageVector = icon,
-						contentDescription = null,
-						tint = MaterialTheme.colorScheme.primary,
-						modifier = Modifier.size(VideoMaxDimens.iconSizeMd)
-					)
-					Spacer(modifier = Modifier.padding(VideoMaxDimens.spacingXs))
-				}
-				Text(
-					text = title,
-					style = MaterialTheme.typography.titleMedium,
-					color = MaterialTheme.colorScheme.primary
-				)
-			}
-			Spacer(modifier = Modifier.height(VideoMaxDimens.spacingMd))
-			content()
-		}
-	}
-}
-
-@Composable
-private fun GlassSwitchRow(
-	title: String,
-	subtitle: String? = null,
-	icon: ImageVector? = null,
-	checked: Boolean = false,
-	isToggle: Boolean = true,
-	onCheckedChange: ((Boolean) -> Unit)? = null,
-	onClick: (() -> Unit)? = null
-) {
-	ListItem(
-		headlineContent = {
-			Text(title, color = VideoMaxTheme.extended.textPrimary)
-		},
-		supportingContent = subtitle?.let {
-			{ Text(it, color = VideoMaxTheme.extended.textTertiary) }
-		},
-		leadingContent = icon?.let {
-			{
-				Icon(
-					it,
-					contentDescription = null,
-					tint = MaterialTheme.colorScheme.primary,
-					modifier = Modifier.size(VideoMaxDimens.iconSizeMd)
-				)
-			}
-		},
-		trailingContent = {
-			if (isToggle) {
-				Switch(
-					checked = checked,
-					onCheckedChange = onCheckedChange ?: {},
-					colors = SwitchDefaults.colors(
-						checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-						checkedTrackColor = MaterialTheme.colorScheme.primary
-					)
-				)
-			} else if (onClick != null) {
-				Icon(
-					imageVector = Icons.Default.ChevronRight,
-					contentDescription = null,
-					tint = VideoMaxTheme.extended.textTertiary,
-					modifier = Modifier
-						.size(VideoMaxDimens.iconSizeMd)
-						.clickable { onClick() }
-				)
-			}
-		},
-		modifier = if (!isToggle && onClick != null) Modifier.clickable { onClick() } else Modifier,
-		colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-	)
-}
-
-@Composable
 private fun ColorPickerRow(
 	selectedColor: Long,
 	onColorSelected: (Long) -> Unit
@@ -402,6 +498,7 @@ private fun ColorPickerRow(
 	var showPicker by remember { mutableStateOf(false) }
 
 	val presetColors = listOf(
+		0xFFFFFFFFL,
 		0xFF006B5EL,
 		0xFFE91E63L,
 		0xFF2196F3L,
@@ -409,35 +506,52 @@ private fun ColorPickerRow(
 		0xFF9C27B0L
 	)
 
-	ListItem(
-		headlineContent = {
-			Text("Tu color favorito", color = VideoMaxTheme.extended.textPrimary)
-		},
-		supportingContent = {
-			Text(
-				text = if (selectedColor == 0L) "Por defecto" else "Personalizado",
-				color = VideoMaxTheme.extended.textTertiary
-			)
-		},
-		leadingContent = {
-			Box(
-				modifier = Modifier
-					.size(VideoMaxDimens.iconSizeMd)
-					.clip(RoundedCornerShape(8.dp))
-					.background(if (selectedColor != 0L) Color(selectedColor.toInt()) else MaterialTheme.colorScheme.primary)
-			)
-		},
-		trailingContent = {
-			Icon(
-				imageVector = Icons.Default.ChevronRight,
-				contentDescription = null,
-				tint = VideoMaxTheme.extended.textTertiary,
-				modifier = Modifier.size(VideoMaxDimens.iconSizeMd)
-			)
-		},
-		modifier = Modifier.clickable { showPicker = true },
-		colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-	)
+	Row(
+		modifier = Modifier
+			.fillMaxWidth()
+			.clip(RoundedCornerShape(VideoMaxDimens.radiusMd))
+			.clickable { showPicker = true }
+			.padding(vertical = VideoMaxDimens.spacingSm, horizontal = VideoMaxDimens.spacingXs),
+		verticalAlignment = Alignment.CenterVertically
+	) {
+		Text(
+			"Tu color favorito",
+			style = MaterialTheme.typography.bodyLarge,
+			color = VideoMaxTheme.extended.textPrimary,
+			modifier = Modifier.weight(1f)
+		)
+		Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+			presetColors.take(4).forEach { color ->
+				Box(
+					modifier = Modifier
+						.size(24.dp)
+						.clip(CircleShape)
+						.background(Color(color.toInt()))
+						.then(
+							if (selectedColor == color) Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+							else if (color == 0xFFFFFFFFL) Modifier.border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+							else Modifier
+						)
+				)
+			}
+			if (selectedColor != 0L && selectedColor !in presetColors.take(4)) {
+				Box(
+					modifier = Modifier
+						.size(24.dp)
+						.clip(CircleShape)
+						.background(Color(selectedColor.toInt()))
+						.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+				)
+			}
+		}
+		Spacer(modifier = Modifier.width(VideoMaxDimens.spacingSm))
+		Icon(
+			imageVector = Icons.Default.ChevronRight,
+			contentDescription = null,
+			tint = VideoMaxTheme.extended.textTertiary,
+			modifier = Modifier.size(20.dp)
+		)
+	}
 
 	if (showPicker) {
 		AlertDialog(
@@ -448,8 +562,8 @@ private fun ColorPickerRow(
 					Box(
 						modifier = Modifier
 							.fillMaxWidth()
-							.height(48.dp)
-							.clip(RoundedCornerShape(12.dp))
+							.height(44.dp)
+							.clip(RoundedCornerShape(VideoMaxDimens.radiusMd))
 							.background(MaterialTheme.colorScheme.primary)
 							.clickable {
 								onColorSelected(0L)
@@ -460,20 +574,21 @@ private fun ColorPickerRow(
 						Text("Por defecto", color = MaterialTheme.colorScheme.onPrimary)
 					}
 					Spacer(modifier = Modifier.height(VideoMaxDimens.spacingMd))
-					Row(
-						modifier = Modifier.fillMaxWidth(),
-						horizontalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingMd)
+					LazyVerticalGrid(
+						columns = GridCells.Fixed(4),
+						horizontalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingSm),
+						verticalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingSm)
 					) {
-						presetColors.forEach { color ->
+						items(presetColors) { color ->
 							val isSelected = selectedColor == color
 							Box(
 								modifier = Modifier
-									.weight(1f)
 									.aspectRatio(1f)
-									.clip(RoundedCornerShape(12.dp))
+									.clip(RoundedCornerShape(VideoMaxDimens.radiusSm))
 									.background(Color(color.toInt()))
 									.then(
-										if (isSelected) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, RoundedCornerShape(12.dp))
+										if (isSelected) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, RoundedCornerShape(VideoMaxDimens.radiusSm))
+										else if (color == 0xFFFFFFFFL) Modifier.border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(VideoMaxDimens.radiusSm))
 										else Modifier
 									)
 									.clickable {
@@ -487,7 +602,7 @@ private fun ColorPickerRow(
 			},
 			confirmButton = {},
 			dismissButton = {
-				androidx.compose.material3.TextButton(onClick = { showPicker = false }) {
+				TextButton(onClick = { showPicker = false }) {
 					Text("Cerrar")
 				}
 			}

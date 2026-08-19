@@ -1,4 +1,4 @@
-package com.puma.videomax.presentation.library
+ package com.puma.videomax.presentation.library
 
 import android.content.Intent
 import android.os.Build
@@ -169,31 +169,24 @@ fun LibraryScreen(
 		}
 	}
 
-	val gradient = screenGradient()
-
-	Scaffold(
-		containerColor = Color.Transparent,
-		topBar = {
+	Box(
+		modifier = Modifier
+			.fillMaxSize()
+			.background(screenGradient())
+	) {
+		Column(modifier = Modifier.fillMaxSize()) {
 			LibraryTopBar(
 				videoCountProvider = { state.videoCount },
 				folderCountProvider = { state.folders.size },
 				isGridProvider = { state.isGrid },
 				isSearchOpenProvider = { state.isSearchOpen },
-			queryProvider = { state.query },
-			onToggleLayout = viewModel::toggleLayout,
+				queryProvider = { state.query },
+				onToggleLayout = viewModel::toggleLayout,
 				onSortSelected = viewModel::onSortSelected,
 				onToggleSearch = viewModel::toggleSearch,
 				onQueryChange = viewModel::onQueryChange
 			)
-		},
-		snackbarHost = { SnackbarHost(snackbarHostState) }
-	) { padding ->
-		Box(
-			modifier = Modifier
-				.fillMaxSize()
-				.background(gradient)
-				.padding(padding)
-		) {
+
 			PullToRefreshBox(
 				isRefreshing = state.isScanning,
 				onRefresh = { viewModel.refresh() },
@@ -390,15 +383,15 @@ fun LibraryTopBar(
 									fontSize = 22.sp,
 									letterSpacing = (-0.5).sp
 								)
-							) { append("Video") }
-							withStyle(
-								SpanStyle(
-									color = tertiaryColor,
-									fontWeight = FontWeight.Bold,
-									fontSize = 22.sp,
-									letterSpacing = (-0.5).sp
-								)
-							) { append("Max") }
+						) { append("Ju") }
+						withStyle(
+							SpanStyle(
+								color = tertiaryColor,
+								fontWeight = FontWeight.Bold,
+								fontSize = 22.sp,
+								letterSpacing = (-0.5).sp
+							)
+						) { append("alix") }
 						},
 						style = MaterialTheme.typography.headlineMedium
 					)
@@ -448,12 +441,7 @@ fun LibraryTopBar(
 				}
 			},
 			colors = TopAppBarDefaults.topAppBarColors(
-				containerColor = Color(
-					MaterialTheme.colorScheme.primary.red,
-					MaterialTheme.colorScheme.primary.green,
-					MaterialTheme.colorScheme.primary.blue,
-					0.10f
-				).compositeOver(MaterialTheme.colorScheme.surface),
+				containerColor = Color.Transparent,
 				titleContentColor = MaterialTheme.colorScheme.onSurface
 			)
 		)

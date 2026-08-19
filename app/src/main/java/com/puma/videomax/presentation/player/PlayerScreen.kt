@@ -1,3 +1,5 @@
+@file:Suppress("UnsafeOptInUsageError")
+
 package com.puma.videomax.presentation.player
 
 import android.app.Activity

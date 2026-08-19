@@ -17,8 +17,8 @@ android {
 		applicationId = "com.puma.videomax"
 		minSdk = 26
 		targetSdk = 36
-		versionCode = 5
-		versionName = "1.2.0"
+		versionCode = 9
+		versionName = "0.9.1"
 
 		testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -97,6 +97,9 @@ dependencies {
 
 	implementation(libs.coil.compose)
 	implementation(libs.coil.video)
+
+	implementation(libs.play.services.ads)
+	implementation(libs.user.messaging.platform)
 
 	implementation(libs.kotlinx.coroutines.android)
 

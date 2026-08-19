@@ -50,7 +50,8 @@ data class AppSettings(
 	val autoPip: Boolean = false,
 	val lastScanTimestamp: Long = 0L,
 	val privateFolderPin: String? = null,
-	val privateVideoIds: List<Long> = emptyList()
+	val privateVideoIds: List<Long> = emptyList(),
+	val termsAccepted: Boolean = false
 )
 
 data class SubtitleTrack(

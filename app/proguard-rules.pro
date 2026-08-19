@@ -97,3 +97,11 @@
 }
 -keep class kotlin.jvm.internal.** { *; }
 -dontwarn kotlin.**
+
+# ============================================================
+# GOOGLE MOBILE ADS / ADMOB
+# ============================================================
+-keep class com.google.android.gms.ads.** { *; }
+-dontwarn com.google.android.gms.ads.**
+-keep class com.google.android.gms.internal.ads.** { *; }
+-dontwarn com.google.android.gms.internal.ads.**

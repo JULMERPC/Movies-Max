@@ -44,6 +44,7 @@ class SettingsDataStore @Inject constructor(
 		val lastScanTimestamp = longPreferencesKey("last_scan_timestamp")
 		val privateFolderPin = stringPreferencesKey("private_folder_pin")
 		val privateVideoIds = stringPreferencesKey("private_video_ids")
+		val termsAccepted = booleanPreferencesKey("terms_accepted")
 	}
 
 	val settings: Flow<AppSettings> = context.settingsDataStore.data.map { prefs ->
@@ -68,7 +69,8 @@ class SettingsDataStore @Inject constructor(
 			autoPip = prefs[Keys.autoPip] ?: false,
 			lastScanTimestamp = prefs[Keys.lastScanTimestamp] ?: 0L,
 			privateFolderPin = prefs[Keys.privateFolderPin],
-			privateVideoIds = decodeLongList(prefs[Keys.privateVideoIds])
+			privateVideoIds = decodeLongList(prefs[Keys.privateVideoIds]),
+			termsAccepted = prefs[Keys.termsAccepted] ?: false
 		)
 	}
 
@@ -137,6 +139,10 @@ class SettingsDataStore @Inject constructor(
 		context.settingsDataStore.edit {
 			it[Keys.privateVideoIds] = encodeLongList(ids)
 		}
+	}
+
+	suspend fun setTermsAccepted(accepted: Boolean) {
+		context.settingsDataStore.edit { it[Keys.termsAccepted] = accepted }
 	}
 
 	private fun encodeLongList(ids: List<Long>): String =

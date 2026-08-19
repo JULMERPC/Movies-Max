@@ -48,4 +48,6 @@ class SettingsRepositoryImpl @Inject constructor(
 	override suspend fun setPrivateFolderPin(pin: String?) = dataStore.setPrivateFolderPin(pin)
 
 	override suspend fun setPrivateVideoIds(ids: List<Long>) = dataStore.setPrivateVideoIds(ids)
+
+	override suspend fun setTermsAccepted(accepted: Boolean) = dataStore.setTermsAccepted(accepted)
 }

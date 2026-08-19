@@ -6,11 +6,19 @@ import coil.ImageLoaderFactory
 import coil.decode.VideoFrameDecoder
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import com.puma.videomax.ads.AdConfig
+import com.google.android.gms.ads.MobileAds
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.Dispatchers
 
 @HiltAndroidApp
 class VideoPlayerProApp : Application(), ImageLoaderFactory {
+
+	override fun onCreate() {
+		super.onCreate()
+		AdConfig.init(this)
+		MobileAds.initialize(this) {}
+	}
 
 	override fun newImageLoader(): ImageLoader =
 		ImageLoader.Builder(this)

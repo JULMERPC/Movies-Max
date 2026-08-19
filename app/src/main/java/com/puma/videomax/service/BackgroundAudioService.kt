@@ -24,6 +24,15 @@ class BackgroundAudioService : MediaSessionService() {
 
 	private var mediaSession: MediaSession? = null
 	private val mainHandler = Handler(Looper.getMainLooper())
+	private val positionUpdater = object : Runnable {
+		override fun run() {
+			val player = mediaSession?.player
+			if (player != null && player.isPlaying) {
+				BackgroundAudioManager.setPosition(player.currentPosition.coerceAtLeast(0L))
+			}
+			mainHandler.postDelayed(this, POSITION_UPDATE_MS)
+		}
+	}
 
 	override fun onCreate() {
 		super.onCreate()
@@ -50,8 +59,12 @@ class BackgroundAudioService : MediaSessionService() {
 				mediaSession?.player?.let { player ->
 					player.playWhenReady = playing
 				}
+			},
+			onSeekRequest = { positionMs ->
+				mediaSession?.player?.seekTo(positionMs)
 			}
 		)
+		mainHandler.post(positionUpdater)
 	}
 
 	override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -108,6 +121,8 @@ class BackgroundAudioService : MediaSessionService() {
 		player.setMediaItem(buildMediaItem(item))
 		player.prepare()
 		player.play()
+		BackgroundAudioManager.setPosition(0L)
+		startForeground(NOTIFICATION_ID, buildNotification())
 	}
 
 	override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
@@ -128,6 +143,7 @@ class BackgroundAudioService : MediaSessionService() {
 						player.setMediaItem(buildMediaItem(nextItem))
 						player.prepare()
 						player.play()
+						startForeground(NOTIFICATION_ID, buildNotification())
 					} else {
 						BackgroundAudioManager.stop()
 						stopSelf()
@@ -148,7 +164,7 @@ class BackgroundAudioService : MediaSessionService() {
 			.setMediaMetadata(
 				MediaMetadata.Builder()
 					.setTitle(item.displayName)
-					.setArtist(item.artist.ifEmpty { "VideoMax" })
+					.setArtist(item.artist.ifEmpty { "Jualix" })
 					.setAlbumTitle(item.album.ifEmpty { "" })
 					.build()
 			)
@@ -170,6 +186,7 @@ class BackgroundAudioService : MediaSessionService() {
 	}
 
 	private fun buildNotification(): Notification {
+		val current = BackgroundAudioManager.current()
 		val pendingIntent = PendingIntent.getActivity(
 			this, 0,
 			Intent(this, MainActivity::class.java),
@@ -183,6 +200,8 @@ class BackgroundAudioService : MediaSessionService() {
 		}
 		return builder
 			.setSmallIcon(android.R.drawable.ic_media_play)
+			.setContentTitle(current?.displayName ?: "Jualix")
+			.setContentText(current?.artist?.ifEmpty { "Jualix" } ?: "Jualix")
 			.setContentIntent(pendingIntent)
 			.setPriority(Notification.PRIORITY_MIN)
 			.setCategory(Notification.CATEGORY_SERVICE)
@@ -200,6 +219,7 @@ class BackgroundAudioService : MediaSessionService() {
 	}
 
 	override fun onDestroy() {
+		mainHandler.removeCallbacks(positionUpdater)
 		BackgroundAudioManager.unregisterCallbacks()
 		mediaSession?.run {
 			player.removeListener(playbackListener)
@@ -217,5 +237,6 @@ class BackgroundAudioService : MediaSessionService() {
 		const val EXTRA_AUTO_PLAY_NEXT = "auto_play_next"
 		private const val CHANNEL_ID = "background_audio"
 		private const val NOTIFICATION_ID = 1001
+		private const val POSITION_UPDATE_MS = 500L
 	}
 }
