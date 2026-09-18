@@ -18,8 +18,9 @@ class FavoritesRepositoryImpl @Inject constructor(
 		videoDao.observeFavorites().map { list -> list.map { it.toDomain() } }
 
 	override suspend fun toggleFavorite(videoId: Long) {
-		val current = videoDao.isFavorite(videoId) ?: false
-		videoDao.updateFavorite(videoId, !current)
+		// Guarded: a heart tap must never crash the app ("me bota de la app").
+		// Single atomic statement — no read-then-write lost updates either.
+		runCatching { videoDao.toggleFavorite(videoId) }
 	}
 
 	override suspend fun isFavorite(videoId: Long): Boolean =

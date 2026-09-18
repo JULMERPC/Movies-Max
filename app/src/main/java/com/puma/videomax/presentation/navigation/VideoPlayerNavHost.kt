@@ -5,7 +5,6 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -26,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -34,8 +34,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.puma.videomax.ads.BannerAd
+import com.puma.videomax.ads.AdsManager
 import com.puma.videomax.presentation.details.DetailsScreen
+import com.puma.videomax.presentation.favorites.FavoritesScreen
 import com.puma.videomax.presentation.library.LibraryScreen
 import com.puma.videomax.presentation.music.MiniPlayer
 import com.puma.videomax.presentation.music.MusicScreen
@@ -57,10 +58,11 @@ private data class BottomItem(
 )
 
 @Composable
-fun VideoPlayerNavHost() {
+fun VideoPlayerNavHost(adsManager: AdsManager) {
 	val navController = rememberNavController()
 	val backStack by navController.currentBackStackEntryAsState()
 	val currentRoute = backStack?.destination?.route
+	val activity = LocalContext.current as android.app.Activity
 	val showNav = currentRoute in setOf(
 		Screen.Library.route,
 		Screen.Music.route,
@@ -76,86 +78,94 @@ fun VideoPlayerNavHost() {
 	)
 
 	BoxWithConstraints {
-		val isWideScreen = maxWidth >= 600.dp
+        ->
+        val isWideScreen = maxWidth >= 600.dp
 
-		Scaffold(
-			bottomBar = {
-				if (showNav && !isWideScreen) {
-					Column {
-						BannerAd()
-						NavigationBar {
-							items.forEach { item ->
-								NavigationBarItem(
-									selected = currentRoute == item.screen.route,
-									onClick = {
-										navController.navigate(item.screen.route) {
-											popUpTo(navController.graph.findStartDestination().id) {
-												saveState = true
-											}
-											launchSingleTop = true
-											restoreState = true
+ Scaffold(
+		bottomBar = {
+			if (showNav && !isWideScreen) {
+				NavigationBar {
+						items.forEach { item ->
+							NavigationBarItem(
+								selected = currentRoute == item.screen.route,
+								onClick = {
+									navController.navigate(item.screen.route) {
+										popUpTo(navController.graph.findStartDestination().id) {
+											saveState = true
 										}
-									},
-									icon = { Icon(item.icon, contentDescription = item.label) },
-									label = { Text(item.label) }
-								)
-							}
-						}
+										launchSingleTop = true
+										restoreState = true
+									}
+								},
+							icon = { Icon(item.icon, contentDescription = item.label) },
+							label = { Text(item.label) }
+						)
 					}
 				}
 			}
-		) { padding ->
-			Box(modifier = Modifier.padding(padding).fillMaxSize()) {
-				Row(modifier = Modifier.fillMaxSize()) {
-					if (showNav && isWideScreen) {
-						NavigationRail {
-							items.forEach { item ->
-								NavigationRailItem(
-									selected = currentRoute == item.screen.route,
-									onClick = {
-										navController.navigate(item.screen.route) {
-											popUpTo(navController.graph.findStartDestination().id) {
-												saveState = true
-											}
-											launchSingleTop = true
-											restoreState = true
+		}
+	) { padding ->
+		Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+			Row(modifier = Modifier.fillMaxSize()) {
+				if (showNav && isWideScreen) {
+					NavigationRail(modifier = Modifier.weight(1f)) {
+						items.forEach { item ->
+							NavigationRailItem(
+								selected = currentRoute == item.screen.route,
+								onClick = {
+									navController.navigate(item.screen.route) {
+										popUpTo(navController.graph.findStartDestination().id) {
+											saveState = true
 										}
-									},
-									icon = { Icon(item.icon, contentDescription = item.label) },
-									label = { Text(item.label) }
-								)
-							}
+										launchSingleTop = true
+										restoreState = true
+									}
+								},
+								icon = { Icon(item.icon, contentDescription = item.label) },
+								label = { Text(item.label) }
+							)
 						}
 					}
+				}
 
-					NavHost(
-						navController = navController,
-						startDestination = Screen.Library.route,
-						modifier = Modifier.weight(1f)
-					) {
+				NavHost(
+					navController = navController,
+					startDestination = Screen.Library.route,
+					modifier = Modifier.weight(1f)
+				) {
 					composable(Screen.Library.route) {
-						LibraryScreen(
-							onOpenPlayer = { id ->
-								navController.navigate(Screen.Player.createRoute(id))
-							},
-							onOpenDetails = { id ->
-								navController.navigate(Screen.Details.createRoute(id))
-							}
-						)
-					}
-					composable(Screen.Music.route) {
-						MusicScreen()
-					}
-					composable(Screen.Playlists.route) {
-						PlaylistsScreen(
-							onOpenPlaylist = { id ->
-								navController.navigate(Screen.PlaylistDetail.createRoute(id))
-							},
-							onOpenSmart = { type ->
-								navController.navigate(Screen.SmartCollection.createRoute(type))
-							}
-						)
-					}
+					LibraryScreen(
+						onOpenPlayer = { id ->
+							navController.navigate(Screen.Player.createRoute(id))
+						},
+						onOpenDetails = { id ->
+							navController.navigate(Screen.Details.createRoute(id))
+						}
+					)
+				}
+				composable(Screen.Music.route) {
+					MusicScreen()
+				}
+				composable(Screen.Favorites.route) {
+					FavoritesScreen(
+						onOpenPlayer = { id ->
+							navController.navigate(Screen.Player.createRoute(id))
+						}
+					)
+				}
+				composable(Screen.Playlists.route) {
+					PlaylistsScreen(
+						onOpenPlaylist = { id ->
+							navController.navigate(Screen.PlaylistDetail.createRoute(id))
+						},
+						onOpenSmart = { type ->
+							navController.navigate(Screen.SmartCollection.createRoute(type))
+						},
+						onOpenFavorites = {
+							navController.navigate(Screen.Favorites.route)
+						}
+					)
+				}
 					composable(Screen.Settings.route) {
 						SettingsScreen(
 							onOpenPrivateFolder = {
@@ -240,32 +250,37 @@ fun VideoPlayerNavHost() {
 						SmartCollectionScreen(
 							onBack = { navController.popBackStack() },
 							onOpenPlayer = { id ->
-								navController.navigate(Screen.Player.createRoute(id))
+								// Section transition: AdController decides (consent,
+								// no Premium/pass, 12-min cap). Navigation never blocks.
+								adsManager.showInterstitialIfAllowed(activity) {
+									navController.navigate(Screen.Player.createRoute(id))
+								}
 							}
 						)
 					}
 				}
-				}
-
-				MiniPlayer(
-					onOpenFullPlayer = {
-						navController.navigate(Screen.Music.route) {
-							popUpTo(navController.graph.findStartDestination().id) {
-								saveState = true
-							}
-							launchSingleTop = true
-							restoreState = true
-						}
-					},
-					onClose = {
-						BackgroundAudioManager.clear()
-						navController.context.stopService(
-							android.content.Intent(navController.context, BackgroundAudioService::class.java)
-						)
-					},
-					modifier = Modifier.align(Alignment.BottomCenter)
-				)
 			}
+
+			MiniPlayer(
+				onOpenFullPlayer = {
+					navController.navigate(Screen.Music.route) {
+						popUpTo(navController.graph.findStartDestination().id) {
+							saveState = true
+						}
+						launchSingleTop = true
+						restoreState = true
+					}
+				},
+				onClose = {
+					BackgroundAudioManager.clear()
+					navController.context.stopService(
+						android.content.Intent(navController.context, BackgroundAudioService::class.java)
+					)
+				},
+				isVisible = currentRoute == Screen.Music.route,
+				modifier = Modifier.align(Alignment.BottomCenter)
+			)
 		}
 	}
+}
 }

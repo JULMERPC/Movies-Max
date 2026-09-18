@@ -14,7 +14,8 @@ data class AudioQueueItem(
 	val displayName: String,
 	val artist: String = "",
 	val album: String = "",
-	val albumId: Long = -1L
+	val albumId: Long = -1L,
+	val mimeType: String = ""
 )
 
 object BackgroundAudioManager {
@@ -71,7 +72,7 @@ object BackgroundAudioManager {
 		autoPlayNext = autoAdvance
 		_queue.value = items
 		_currentIndex.value = startIndex.coerceIn(0, items.lastIndex.coerceAtLeast(0))
-		_isPlaying.value = true
+		setPlaying(true)
 	}
 
 	fun playQueue(items: List<AudioQueueItem>, startIndex: Int = 0, autoAdvance: Boolean = false) {
@@ -84,7 +85,55 @@ object BackgroundAudioManager {
 		_queue.update { it + item }
 	}
 
+	/** Namida-style "play next": inserts right after the current track. */
+	fun playNext(item: AudioQueueItem) {
+		val idx = _currentIndex.value
+		_queue.update { q ->
+			if (idx in q.indices) {
+				q.toMutableList().apply { add(idx + 1, item) }
+			} else q + item
+		}
+	}
+
+	/**
+	 * Jumps to an arbitrary queue position and notifies the service so it
+	 * reloads from there (used by the queue sheet tap-to-play).
+	 */
+	fun jumpTo(index: Int) {
+		val q = _queue.value
+		if (index !in q.indices) return
+		_currentIndex.value = index
+		_currentPosition.value = 0L
+		_duration.value = 0L
+		// AUDIT: route through guarded setPlaying so playWhenReady syncs.
+		setPlaying(true)
+		onTrackChange?.invoke(q[index])
+	}
+
+	/** Moves an item inside the queue (queue sheet reorder). */
+	fun move(fromIndex: Int, toIndex: Int) {
+		_queue.update { q ->
+			if (fromIndex !in q.indices || toIndex !in q.indices) return@update q
+			val mutable = q.toMutableList()
+			val item = mutable.removeAt(fromIndex)
+			mutable.add(toIndex, item)
+			val cur = _currentIndex.value
+			_currentIndex.value = when {
+				cur == fromIndex -> toIndex
+				fromIndex < cur && toIndex >= cur -> cur - 1
+				fromIndex > cur && toIndex <= cur -> cur + 1
+				else -> cur
+			}
+			mutable
+		}
+	}
+
 	fun setPlaying(playing: Boolean) {
+		// Echo guard: the service mirrors this into player.playWhenReady, and
+		// the player mirrors isPlaying back here. Forwarding an unchanged value
+		// re-writes playWhenReady and lets transient focus/duck events ping-pong
+		// into a millisecond play/pause loop. Only real changes propagate.
+		if (_isPlaying.value == playing) return
 		_isPlaying.value = playing
 		onPlayPauseChange?.invoke(playing)
 	}
@@ -168,7 +217,7 @@ object BackgroundAudioManager {
 		val item = next() ?: return
 		_currentPosition.value = 0L
 		_duration.value = 0L
-		_isPlaying.value = true
+		setPlaying(true)
 		onTrackChange?.invoke(item)
 	}
 
@@ -176,7 +225,7 @@ object BackgroundAudioManager {
 		val item = previous() ?: return
 		_currentPosition.value = 0L
 		_duration.value = 0L
-		_isPlaying.value = true
+		setPlaying(true)
 		onTrackChange?.invoke(item)
 	}
 
@@ -184,13 +233,18 @@ object BackgroundAudioManager {
 		val q = _queue.value
 		return if (index in q.indices) {
 			_currentIndex.value = index
-			_isPlaying.value = true
+			// NOTE: deliberately does NOT force _isPlaying=true. This is an
+			// index mirror (auto-advance, notification step) — the playing flag
+			// is owned by setPlaying()/player callbacks. Forcing true here
+			// resumed paused playback and desynced the MiniPlayer icon.
 			q[index]
 		} else null
 	}
 
 	fun stop() {
-		_isPlaying.value = false
+		// AUDIT: guarded setPlaying keeps playWhenReady in sync (no-op if the
+		// service already paused it). Direct _isPlaying writes bypassed this.
+		setPlaying(false)
 		_currentPosition.value = 0L
 		_duration.value = 0L
 	}
@@ -198,21 +252,33 @@ object BackgroundAudioManager {
 	fun clear() {
 		_queue.value = emptyList()
 		_currentIndex.value = -1
-		_isPlaying.value = false
+		setPlaying(false)
 		_currentPosition.value = 0L
 		_duration.value = 0L
 		_repeatMode.value = RepeatMode.OFF
 		_isShuffleEnabled.value = false
 	}
 
+	/**
+	 * AUDIT: removing the currently-playing item resyncs the service onto the
+	 * item now at that index (predictable, like Spotify). Before, the player
+	 * kept playing a ghost item while the highlight pointed elsewhere.
+	 */
 	fun removeFromQueue(index: Int) {
-		_queue.update { q ->
-			if (index !in q.indices) return@update q
-			val newList = q.toMutableList().apply { removeAt(index) }
-			if (_currentIndex.value >= newList.size) {
-				_currentIndex.value = newList.lastIndex
-			}
-			newList
+		val q = _queue.value
+		if (index !in q.indices) return
+		val removedCurrent = (index == _currentIndex.value)
+		val newList = q.toMutableList().apply { removeAt(index) }
+		_queue.value = newList
+		if (_currentIndex.value >= newList.size) {
+			_currentIndex.value = newList.lastIndex
+		}
+		if (newList.isEmpty()) {
+			stop()
+			return
+		}
+		if (removedCurrent) {
+			current()?.let { onTrackChange?.invoke(it) }
 		}
 	}
 }

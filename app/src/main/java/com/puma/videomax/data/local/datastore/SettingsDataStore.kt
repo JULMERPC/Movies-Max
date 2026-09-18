@@ -16,6 +16,7 @@ import com.puma.videomax.domain.model.SortOption
 import com.puma.videomax.domain.model.ThemeMode
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,7 +33,6 @@ class SettingsDataStore @Inject constructor(
 		val themeMode = stringPreferencesKey("theme_mode")
 		val sortOption = stringPreferencesKey("sort_option")
 		val musicSortOption = stringPreferencesKey("music_sort_option")
-		val accentColor = longPreferencesKey("accent_color")
 		val playbackSpeed = floatPreferencesKey("playback_speed")
 		val rememberPosition = booleanPreferencesKey("remember_position")
 		val autoPlayNext = booleanPreferencesKey("auto_play_next")
@@ -45,6 +45,15 @@ class SettingsDataStore @Inject constructor(
 		val privateFolderPin = stringPreferencesKey("private_folder_pin")
 		val privateVideoIds = stringPreferencesKey("private_video_ids")
 		val termsAccepted = booleanPreferencesKey("terms_accepted")
+		val videoPlaybackCount = intPreferencesKey("video_playback_count")
+		val hasRatedOrDismissed = booleanPreferencesKey("has_rated_or_dismissed")
+		val lastReviewPromptTimestamp = longPreferencesKey("last_review_prompt_timestamp")
+		val suppressInterstitialUntil = longPreferencesKey("suppress_interstitial_until")
+		val failedVideoIds = stringPreferencesKey("failed_video_ids")
+		val adFreeUntil = longPreferencesKey("ad_free_until")
+		val rewardedProgress = intPreferencesKey("rewarded_progress")
+		val isPremiumRemoveAds = booleanPreferencesKey("is_premium_remove_ads")
+		val lastInterstitialShownAt = longPreferencesKey("last_interstitial_shown_at")
 	}
 
 	val settings: Flow<AppSettings> = context.settingsDataStore.data.map { prefs ->
@@ -58,7 +67,6 @@ class SettingsDataStore @Inject constructor(
 			musicSortOption = prefs[Keys.musicSortOption]?.let {
 				runCatching { MusicSortOption.valueOf(it) }.getOrDefault(MusicSortOption.DATE_DESC)
 			} ?: MusicSortOption.DATE_DESC,
-			accentColor = prefs[Keys.accentColor] ?: 0L,
 			defaultPlaybackSpeed = prefs[Keys.playbackSpeed] ?: 1.0f,
 			rememberPlaybackPosition = prefs[Keys.rememberPosition] ?: true,
 			autoPlayNext = prefs[Keys.autoPlayNext] ?: false,
@@ -70,7 +78,8 @@ class SettingsDataStore @Inject constructor(
 			lastScanTimestamp = prefs[Keys.lastScanTimestamp] ?: 0L,
 			privateFolderPin = prefs[Keys.privateFolderPin],
 			privateVideoIds = decodeLongList(prefs[Keys.privateVideoIds]),
-			termsAccepted = prefs[Keys.termsAccepted] ?: false
+			termsAccepted = prefs[Keys.termsAccepted] ?: false,
+			failedVideoIds = decodeLongList(prefs[Keys.failedVideoIds])
 		)
 	}
 
@@ -84,10 +93,6 @@ class SettingsDataStore @Inject constructor(
 
 	suspend fun setMusicSortOption(option: MusicSortOption) {
 		context.settingsDataStore.edit { it[Keys.musicSortOption] = option.name }
-	}
-
-	suspend fun setAccentColor(color: Long) {
-		context.settingsDataStore.edit { it[Keys.accentColor] = color }
 	}
 
 	suspend fun setDefaultPlaybackSpeed(speed: Float) {
@@ -143,6 +148,92 @@ class SettingsDataStore @Inject constructor(
 
 	suspend fun setTermsAccepted(accepted: Boolean) {
 		context.settingsDataStore.edit { it[Keys.termsAccepted] = accepted }
+	}
+
+	suspend fun incrementVideoPlaybackCount() {
+		context.settingsDataStore.edit {
+			it[Keys.videoPlaybackCount] = (it[Keys.videoPlaybackCount] ?: 0) + 1
+		}
+	}
+
+	suspend fun getVideoPlaybackCount(): Int {
+		return context.settingsDataStore.data.map { it[Keys.videoPlaybackCount] ?: 0 }.first()
+	}
+
+	suspend fun setHasRatedOrDismissed(rated: Boolean) {
+		context.settingsDataStore.edit { it[Keys.hasRatedOrDismissed] = rated }
+	}
+
+	suspend fun getHasRatedOrDismissed(): Boolean {
+		return context.settingsDataStore.data.map { it[Keys.hasRatedOrDismissed] ?: false }.first()
+	}
+
+	suspend fun setLastReviewPromptTimestamp(timestamp: Long) {
+		context.settingsDataStore.edit { it[Keys.lastReviewPromptTimestamp] = timestamp }
+	}
+
+	suspend fun getLastReviewPromptTimestamp(): Long {
+		return context.settingsDataStore.data.map { it[Keys.lastReviewPromptTimestamp] ?: 0L }.first()
+	}
+
+	suspend fun setSuppressInterstitialUntil(timestamp: Long) {
+		context.settingsDataStore.edit { it[Keys.suppressInterstitialUntil] = timestamp }
+	}
+
+	suspend fun getSuppressInterstitialUntil(): Long {
+		return context.settingsDataStore.data.map { it[Keys.suppressInterstitialUntil] ?: 0L }.first()
+	}
+
+	suspend fun setAdFreeUntil(timestamp: Long) {
+		context.settingsDataStore.edit { it[Keys.adFreeUntil] = timestamp }
+	}
+
+	suspend fun getAdFreeUntil(): Long {
+		return context.settingsDataStore.data.map { it[Keys.adFreeUntil] ?: 0L }.first()
+	}
+
+	suspend fun setRewardedProgress(progress: Int) {
+		context.settingsDataStore.edit { it[Keys.rewardedProgress] = progress }
+	}
+
+	suspend fun getRewardedProgress(): Int {
+		return context.settingsDataStore.data.map { it[Keys.rewardedProgress] ?: 0 }.first()
+	}
+
+	suspend fun setPremiumRemoveAds(purchased: Boolean) {
+		context.settingsDataStore.edit { it[Keys.isPremiumRemoveAds] = purchased }
+	}
+
+	suspend fun isPremiumRemoveAds(): Boolean {
+		return context.settingsDataStore.data.map { it[Keys.isPremiumRemoveAds] ?: false }.first()
+	}
+
+	suspend fun setLastInterstitialShownAt(timestamp: Long) {
+		context.settingsDataStore.edit { it[Keys.lastInterstitialShownAt] = timestamp }
+	}
+
+	suspend fun getLastInterstitialShownAt(): Long {
+		return context.settingsDataStore.data.map { it[Keys.lastInterstitialShownAt] ?: 0L }.first()
+	}
+
+	suspend fun addFailedVideoId(videoId: Long) {
+		context.settingsDataStore.edit { prefs ->
+			val current = decodeLongList(prefs[Keys.failedVideoIds])
+			if (videoId !in current) {
+				prefs[Keys.failedVideoIds] = encodeLongList(current + videoId)
+			}
+		}
+	}
+
+	suspend fun removeFailedVideoId(videoId: Long) {
+		context.settingsDataStore.edit { prefs ->
+			val current = decodeLongList(prefs[Keys.failedVideoIds])
+			prefs[Keys.failedVideoIds] = encodeLongList(current - videoId)
+		}
+	}
+
+	suspend fun getFailedVideoIds(): List<Long> {
+		return context.settingsDataStore.data.map { decodeLongList(it[Keys.failedVideoIds]) }.first()
 	}
 
 	private fun encodeLongList(ids: List<Long>): String =

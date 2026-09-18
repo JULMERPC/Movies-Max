@@ -39,7 +39,6 @@ data class AppSettings(
 	val themeMode: ThemeMode = ThemeMode.SYSTEM,
 	val sortOption: SortOption = SortOption.DATE_DESC,
 	val musicSortOption: MusicSortOption = MusicSortOption.DATE_DESC,
-	val accentColor: Long = 0L,
 	val defaultPlaybackSpeed: Float = 1.0f,
 	val rememberPlaybackPosition: Boolean = true,
 	val autoPlayNext: Boolean = false,
@@ -51,6 +50,7 @@ data class AppSettings(
 	val lastScanTimestamp: Long = 0L,
 	val privateFolderPin: String? = null,
 	val privateVideoIds: List<Long> = emptyList(),
+	val failedVideoIds: List<Long> = emptyList(),
 	val termsAccepted: Boolean = false
 )
 

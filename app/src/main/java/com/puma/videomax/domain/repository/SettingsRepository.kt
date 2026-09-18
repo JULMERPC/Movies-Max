@@ -11,7 +11,6 @@ interface SettingsRepository {
 	suspend fun setThemeMode(mode: ThemeMode)
 	suspend fun setSortOption(option: SortOption)
 	suspend fun setMusicSortOption(option: MusicSortOption)
-	suspend fun setAccentColor(color: Long)
 	suspend fun setDefaultPlaybackSpeed(speed: Float)
 	suspend fun setRememberPlaybackPosition(enabled: Boolean)
 	suspend fun setAutoPlayNext(enabled: Boolean)
@@ -24,4 +23,6 @@ interface SettingsRepository {
 	suspend fun setPrivateFolderPin(pin: String?)
 	suspend fun setPrivateVideoIds(ids: List<Long>)
 	suspend fun setTermsAccepted(accepted: Boolean)
+	suspend fun addFailedVideoId(videoId: Long)
+	suspend fun removeFailedVideoId(videoId: Long)
 }

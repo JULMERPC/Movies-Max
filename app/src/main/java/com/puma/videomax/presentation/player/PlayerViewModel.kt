@@ -2,16 +2,25 @@ package com.puma.videomax.presentation.player
 
 import android.app.Application
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import androidx.media3.extractor.DefaultExtractorsFactory
+import androidx.media3.extractor.mp4.Mp4Extractor
 import com.puma.videomax.domain.model.AppSettings
 import com.puma.videomax.domain.model.SubtitleTrack
 import com.puma.videomax.domain.model.Video
@@ -20,8 +29,11 @@ import com.puma.videomax.domain.usecase.ObserveSettingsUseCase
 import com.puma.videomax.domain.usecase.SavePlaybackProgressUseCase
 import com.puma.videomax.domain.usecase.ToggleFavoriteUseCase
 import com.puma.videomax.domain.repository.VideoRepository
+import com.puma.videomax.service.audio.VolumeStateProvider
+import com.puma.videomax.util.InAppReviewManager
 import com.puma.videomax.util.SubtitleHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -31,6 +43,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -45,6 +58,10 @@ data class PlayerProgressState(
 	val bufferedMs: Long = 0L,
 	val durationMs: Long = 0L
 )
+
+sealed class PlayerEvent {
+	data object TriggerReview : PlayerEvent()
+}
 
 data class PlayerUiState(
 	val video: Video? = null,
@@ -79,13 +96,39 @@ class PlayerViewModel @Inject constructor(
 	private val playbackQueue: PlaybackQueue,
 	private val videoRepository: VideoRepository,
 	private val settingsRepository: com.puma.videomax.domain.repository.SettingsRepository,
-	observeSettings: ObserveSettingsUseCase
+	observeSettings: ObserveSettingsUseCase,
+	private val inAppReviewManager: InAppReviewManager,
+	private val volumeStateProvider: VolumeStateProvider,
 ) : AndroidViewModel(application) {
 
-	val player: ExoPlayer = ExoPlayer.Builder(application).build().apply {
-		playWhenReady = true
-		repeatMode = Player.REPEAT_MODE_OFF
-	}
+	val player: ExoPlayer = ExoPlayer.Builder(application)
+		.setRenderersFactory(
+			DefaultRenderersFactory(application)
+				.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+				.setEnableDecoderFallback(true)
+		)
+		.setMediaSourceFactory(
+			ProgressiveMediaSource.Factory(
+				DefaultDataSource.Factory(application),
+				DefaultExtractorsFactory()
+					.setMp4ExtractorFlags(Mp4Extractor.FLAG_WORKAROUND_IGNORE_EDIT_LISTS)
+			)
+		)
+		.setTrackSelector(DefaultTrackSelector(application))
+		.setHandleAudioBecomingNoisy(true)
+		.setWakeMode(C.WAKE_MODE_NETWORK)
+		.setAudioAttributes(
+			AudioAttributes.Builder()
+				.setUsage(C.USAGE_MEDIA)
+				.setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+				.build(),
+			/* handleAudioFocus = */ true
+		)
+		.build()
+		.apply {
+			playWhenReady = true
+			repeatMode = Player.REPEAT_MODE_OFF
+		}
 
 	private val initialVideoId: Long = checkNotNull(savedStateHandle["videoId"])
 
@@ -95,6 +138,10 @@ class PlayerViewModel @Inject constructor(
 	/** High-frequency timeline updates — collected only by the progress bar UI. */
 	private val _progressState = MutableStateFlow(PlayerProgressState())
 	val progressState: StateFlow<PlayerProgressState> = _progressState.asStateFlow()
+
+	/** One-shot events consumed by the UI (e.g., trigger in-app review). */
+	private val _events = Channel<PlayerEvent>(Channel.BUFFERED)
+	val events = _events.receiveAsFlow()
 
 	private var settings: AppSettings = AppSettings()
 	private var progressJob: Job? = null
@@ -116,6 +163,80 @@ class PlayerViewModel @Inject constructor(
 	private val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
 	private val playerListener = object : Player.Listener {
+		override fun onPlayerError(error: PlaybackException) {
+			Log.e(TAG, "Playback error: ${error.errorCodeName}", error)
+
+			val video = player.currentMediaItem?.localConfiguration?.tag as? Video
+			if (video != null) {
+				viewModelScope.launch {
+					runCatching { settingsRepository.addFailedVideoId(video.id) }
+				}
+			}
+
+			val cause = error.cause
+			val uri = player.currentMediaItem?.localConfiguration?.uri
+
+			if (uri != null && cause is java.io.IOException) {
+				Log.w(TAG, "I/O error on uri=$uri — attempting FileDescriptor fallback", cause)
+				viewModelScope.launch(Dispatchers.IO) {
+					val afd = try {
+						getApplication<Application>().contentResolver.openFileDescriptor(uri, "r")
+					} catch (_: Exception) { null }
+
+					if (afd != null) {
+						afd.close()
+						withContext(Dispatchers.Main) {
+							val pos = player.currentPosition
+							val pwReady = player.playWhenReady
+							val speed = player.playbackParameters.speed
+							player.setMediaItem(
+								MediaItem.Builder()
+									.setUri(uri)
+									.setMediaId(player.currentMediaItem?.mediaId ?: "0")
+									.setTag(player.currentMediaItem?.localConfiguration?.tag)
+									.build(),
+								pos
+							)
+							player.prepare()
+							player.playbackParameters = PlaybackParameters(speed)
+							player.playWhenReady = pwReady
+						}
+						Log.i(TAG, "FileDescriptor fallback succeeded for uri=$uri")
+						return@launch
+					}
+
+					withContext(Dispatchers.Main) {
+						val errorTitle = classifyError(error)
+						_uiState.update {
+							it.copy(
+								gestureHint = errorTitle,
+								controlsVisible = true,
+								isPlaying = false
+							)
+						}
+						viewModelScope.launch {
+							delay(3_000)
+							_uiState.update { it.copy(gestureHint = null) }
+						}
+					}
+				}
+				return
+			}
+
+			val errorTitle = classifyError(error)
+			_uiState.update {
+				it.copy(
+					gestureHint = errorTitle,
+					controlsVisible = true,
+					isPlaying = false
+				)
+			}
+			viewModelScope.launch {
+				delay(3_000)
+				_uiState.update { it.copy(gestureHint = null) }
+			}
+		}
+
 		override fun onIsPlayingChanged(isPlaying: Boolean) {
 			_uiState.update { it.copy(isPlaying = isPlaying) }
 			if (isPlaying) scheduleHideControls() else cancelHideControls()
@@ -132,6 +253,11 @@ class PlayerViewModel @Inject constructor(
 			if (playbackState == Player.STATE_ENDED) {
 				viewModelScope.launch {
 					persistProgress()
+					val duration = player.duration
+					if (duration > 0L) {
+						inAppReviewManager.onVideoPlaybackCompleted(duration)
+						_events.trySend(PlayerEvent.TriggerReview)
+					}
 					when (_uiState.value.repeatMode) {
 						QueueRepeatMode.ONE -> {
 							player.seekTo(0L)
@@ -206,6 +332,16 @@ class PlayerViewModel @Inject constructor(
 	init {
 		playbackQueue.ensureSingle(initialVideoId)
 		player.addListener(playerListener)
+		// Reactive system volume (Namida: observe, never poll getStreamVolume).
+		volumeStateProvider.start()
+		syncSystemVolumeToUi(volumeStateProvider.fraction())
+		viewModelScope.launch {
+			// StateFlow already conflates + suppresses equal values; the
+			// explicit epsilon guard lives in syncSystemVolumeToUi().
+			volumeStateProvider.volume.collect {
+				syncSystemVolumeToUi(volumeStateProvider.fraction())
+			}
+		}
 		viewModelScope.launch {
 			observeSettings().collect { latest ->
 				settings = latest
@@ -754,6 +890,17 @@ class PlayerViewModel @Inject constructor(
 		if (fromGesture) scheduleClearGestureHint()
 	}
 
+	/**
+	 * Mirrors hardware-button / system volume changes into UI state.
+	 * No-op when the delta is negligible to avoid feedback loops with the
+	 * gesture writer in [PlayerScreen].
+	 */
+	fun syncSystemVolumeToUi(fraction: Float) {
+		val coerced = fraction.coerceIn(0f, 1f)
+		if (kotlin.math.abs(coerced - _uiState.value.volumeFraction) < 0.01f) return
+		_uiState.update { it.copy(volumeFraction = coerced) }
+	}
+
 	fun clearGestureHint() {
 		_uiState.update { it.copy(gestureHint = null) }
 	}
@@ -827,7 +974,7 @@ class PlayerViewModel @Inject constructor(
 	fun toggleFavorite() {
 		val id = _uiState.value.video?.id ?: return
 		viewModelScope.launch {
-			toggleFavoriteUseCase(id)
+			runCatching { toggleFavoriteUseCase(id) }
 			_uiState.update { state ->
 				state.copy(video = state.video?.copy(isFavorite = !(state.video.isFavorite)))
 			}
@@ -914,6 +1061,7 @@ class PlayerViewModel @Inject constructor(
 		}
 		subtitleLoadJob?.cancel()
 		subtitleCache.clear()
+		volumeStateProvider.stop()
 		progressJob?.cancel()
 		hideControlsJob?.cancel()
 		gestureHintJob?.cancel()
@@ -1010,6 +1158,22 @@ class PlayerViewModel @Inject constructor(
 	}
 
 	private companion object {
+		const val TAG = "PlayerViewModel"
 		const val PROGRESS_POLL_MS = 500L
+
+		fun classifyError(error: PlaybackException): String = when (error.errorCode) {
+			PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+			PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
+			PlaybackException.ERROR_CODE_DECODING_FAILED -> "Formato no compatible"
+			PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED,
+			PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED -> "Error de audio"
+			PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
+			PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED -> "Error de red"
+			PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND,
+			PlaybackException.ERROR_CODE_IO_UNSPECIFIED -> "Error de archivo / almacenamiento"
+			PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED -> "Archivo dañado o incompleto"
+			PlaybackException.ERROR_CODE_DECODER_INIT_FAILED -> "Decodificador no disponible"
+			else -> "Error de reproducción"
+		}
 	}
 }

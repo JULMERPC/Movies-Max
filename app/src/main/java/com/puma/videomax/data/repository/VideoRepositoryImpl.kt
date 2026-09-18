@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import com.puma.videomax.data.local.db.FtsQuery
+import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
@@ -273,6 +274,7 @@ class VideoRepositoryImpl @Inject constructor(
 
 		val nomediaDirs = if (!settings.showNomedia) collectNomediaDirs() else emptySet()
 		val privateIds = settings.privateVideoIds.toSet()
+		val failedIds = settings.failedVideoIds.toSet()
 
 		videoDao.clearScanKeepIds()
 
@@ -290,6 +292,7 @@ class VideoRepositoryImpl @Inject constructor(
 			val merged = batch.videos.mapNotNull { fresh ->
 				if (!settings.showHiddenFiles && isHidden(fresh)) return@mapNotNull null
 				if (fresh.id in privateIds) return@mapNotNull null
+				if (fresh.id in failedIds) return@mapNotNull null
 				if (nomediaDirs.isNotEmpty() && isInNomediaDir(fresh, nomediaDirs)) return@mapNotNull null
 				val state = userState[fresh.id]
 				if (state != null) {
@@ -420,7 +423,8 @@ class VideoRepositoryImpl @Inject constructor(
 			"Download",
 			"DCIM",
 			"Movies",
-			"Video"
+			"Video",
+			"snaptube/download"
 		)
 		val videoExtensions = setOf("mp4", "3gp", "mkv", "avi", "mov", "webm", "flv", "wmv", "m4v", "ts", "mpg", "mpeg")
 
@@ -453,9 +457,11 @@ class VideoRepositoryImpl @Inject constructor(
 
 							val id = (path.hashCode().toLong() + Long.MAX_VALUE / 2)
 
+							val uri = resolveContentUri(file) ?: Uri.fromFile(file).toString()
+
 							results += VideoEntity(
 								id = id,
-								uri = Uri.fromFile(file).toString(),
+								uri = uri,
 								displayName = file.name,
 								path = path,
 								durationMs = 0L,
@@ -479,20 +485,58 @@ class VideoRepositoryImpl @Inject constructor(
 		return results
 	}
 
+	/**
+	 * Resolves a [File] to a `content://` MediaStore URI by querying MediaStore
+	 * for the file's _ID. Returns `null` if the file is not registered in MediaStore,
+	 * so the caller falls back to a properly constructed `file://` URI.
+	 *
+	 * This avoids `FileUriExposedException` on API 24+ and preserves Unicode
+	 * characters in filenames (e.g. Japanese `_アニメ_...`) because the content URI
+	 * is identified by numeric ID, not by path encoding.
+	 */
+	private fun resolveContentUri(file: File): String? {
+		val projection = arrayOf(MediaStore.Video.Media._ID)
+		val selection = "${MediaStore.Video.Media.DATA} = ?"
+		val selectionArgs = arrayOf(file.absolutePath)
+
+		return context.contentResolver.query(
+			MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+			projection,
+			selection,
+			selectionArgs,
+			null
+		)?.use { cursor ->
+			if (cursor.moveToFirst()) {
+				val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID))
+				val collection = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+					MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+				} else {
+					MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+				}
+				ContentUris.withAppendedId(collection, id).toString()
+			} else {
+				null
+			}
+		}
+	}
+
 	override suspend fun updateFavorite(videoId: Long, isFavorite: Boolean) {
-		videoDao.updateFavorite(videoId, isFavorite)
+		// Guarded: any SQLiteException here (DB busy during background scan)
+		// used to escape viewModelScope.launch and kill the app on heart tap.
+		runCatching { videoDao.updateFavorite(videoId, isFavorite) }
 	}
 
 	override suspend fun updateLastPosition(videoId: Long, positionMs: Long) {
-		videoDao.updateLastPosition(videoId, positionMs)
+		runCatching { videoDao.updateLastPosition(videoId, positionMs) }
 	}
 
 	override suspend fun incrementPlayCount(videoId: Long) {
-		videoDao.incrementPlayCount(videoId)
+		runCatching { videoDao.incrementPlayCount(videoId) }
 	}
 
 	override suspend fun markVideoSeen(videoId: Long) {
-		videoDao.updateIsNew(videoId, isNew = false)
+		// Guarded: runs on every video open; a throw here crashed open-video.
+		runCatching { videoDao.updateIsNew(videoId, isNew = false) }
 	}
 
 	override suspend fun deleteVideo(videoId: Long) = withContext(Dispatchers.IO) {
@@ -501,7 +545,9 @@ class VideoRepositoryImpl @Inject constructor(
 		try {
 			context.contentResolver.delete(uri, null, null)
 		} catch (_: Exception) { }
-		videoDao.deleteByIds(listOf(videoId))
+		try {
+			videoDao.deleteByIds(listOf(videoId))
+		} catch (_: Exception) { }
 	}
 
 	override suspend fun renameVideo(videoId: Long, newName: String) = withContext(Dispatchers.IO) {
@@ -513,7 +559,9 @@ class VideoRepositoryImpl @Inject constructor(
 		try {
 			context.contentResolver.update(uri, values, null, null)
 		} catch (_: Exception) { }
-		videoDao.updateDisplayName(videoId, newName)
+		try {
+			videoDao.updateDisplayName(videoId, newName)
+		} catch (_: Exception) { }
 	}
 
 	/** Path-based only — avoids per-file filesystem I/O during scan. */

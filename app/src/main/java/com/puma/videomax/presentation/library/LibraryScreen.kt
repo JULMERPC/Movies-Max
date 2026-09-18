@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -82,6 +83,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
+import com.puma.videomax.ads.NativeAdSlot
+import com.puma.videomax.domain.ads.NativeAdPlacer
 import com.puma.videomax.domain.model.SortOption
 import com.puma.videomax.domain.model.Video
 import com.puma.videomax.presentation.components.EmptyState
@@ -90,7 +93,7 @@ import com.puma.videomax.presentation.components.VideoListItem
 import com.puma.videomax.presentation.components.VideoMenuAction
 import com.puma.videomax.presentation.theme.VideoMaxDimens
 import com.puma.videomax.presentation.theme.VideoMaxTheme
-import com.puma.videomax.presentation.theme.screenGradient
+import com.puma.videomax.presentation.theme.screenColor
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -102,6 +105,7 @@ fun LibraryScreen(
 ) {
 	val state by viewModel.uiState.collectAsStateWithLifecycle()
 	val pagingItems = viewModel.videos.collectAsLazyPagingItems()
+	val adsEnabled by viewModel.adsEnabled.collectAsStateWithLifecycle()
 	val snackbarHostState = remember { SnackbarHostState() }
 	val scope = rememberCoroutineScope()
 	val context = LocalContext.current
@@ -172,7 +176,7 @@ fun LibraryScreen(
 	Box(
 		modifier = Modifier
 			.fillMaxSize()
-			.background(screenGradient())
+			.background(screenColor())
 	) {
 		Column(modifier = Modifier.fillMaxSize()) {
 			LibraryTopBar(
@@ -219,7 +223,8 @@ fun LibraryScreen(
 							}
 						},
 						onFavoriteClick = viewModel::onFavorite,
-						onMenuAction = onMenuAction
+						onMenuAction = onMenuAction,
+						adsEnabled = adsEnabled
 					)
 					}
 					LibraryFilterMode.ALL_FOLDERS -> {
@@ -703,10 +708,14 @@ fun VideoContent(
 	isScanningProvider: () -> Boolean,
 	onVideoClick: (Long) -> Unit,
 	onFavoriteClick: (Long) -> Unit,
-	onMenuAction: ((com.puma.videomax.presentation.components.VideoMenuAction) -> Unit)? = null
+	onMenuAction: ((com.puma.videomax.presentation.components.VideoMenuAction) -> Unit)? = null,
+	adsEnabled: Boolean = true
 ) {
 	val isGrid = isGridProvider()
 	val isScanning = isScanningProvider()
+	// Sin Premium/pase no se reserva ningún slot de nativo: la lista es 100%
+	// contenido, sin huecos fantasma (los slots vacíos igual consumían spacing).
+	val showAds = adsEnabled
 
 	when {
 		pagingItems.itemCount == 0 && isScanning -> {
@@ -719,6 +728,13 @@ fun VideoContent(
 			)
 		}
 		else -> {
+			val totalCount = if (showAds) NativeAdPlacer.totalWithAds(pagingItems.itemCount) else pagingItems.itemCount
+			// Clave estable por id (canónico Paging): el favorito solo cambia
+			// isFavorite del item vía diff de Room/Paging, sin reordenar la
+			// lista. contentType evita que Compose recicle un slot de video
+			// como anuncio (y viceversa), lo que recortaba/dejaba en blanco
+			// los native ads y movía el scroll al recomponer.
+			val videoKey = pagingItems.itemKey { video: Video -> "video_${video.id}" }
 			if (isGrid) {
 				LazyVerticalGrid(
 					columns = GridCells.Adaptive(168.dp),
@@ -728,20 +744,45 @@ fun VideoContent(
 					modifier = Modifier.fillMaxSize()
 				) {
 					items(
-						count = pagingItems.itemCount,
-						key = pagingItems.itemKey { it.id }
-					) { index ->
-						val video = pagingItems[index]
-						if (video == null) {
-							VideoGridSkeleton()
+						count = totalCount,
+						key = { position ->
+							if (showAds && NativeAdPlacer.isAdPosition(position)) {
+								"native_ad_$position"
+							} else {
+								// AUDIT-CRASH #2 (FATAL en logcat con peek()):
+								// hasta peek() tira IndexOutOfBounds en el borde
+								// durante transiciones de refresh. El fallback por
+								// posición nunca tira; el id estable se usa el
+								// 99.9% del tiempo para animaciones correctas.
+								val contentIdx = if (showAds) NativeAdPlacer.contentIndexFor(position) else position
+								runCatching {
+									videoKey(contentIdx)
+								}.getOrNull() ?: "video_pos_$contentIdx"
+							}
+						},
+						contentType = { position ->
+							if (showAds && NativeAdPlacer.isAdPosition(position)) "native_ad" else "video"
+						},
+						span = { position ->
+							if (showAds && NativeAdPlacer.isAdPosition(position)) GridItemSpan(maxLineSpan) else GridItemSpan(1)
+						}
+					) { position ->
+						if (showAds && NativeAdPlacer.isAdPosition(position)) {
+							NativeAdSlot()
 						} else {
-						VideoGridItem(
-							video = video,
-							onClick = { onVideoClick(video.id) },
-							onFavoriteClick = { onFavoriteClick(video.id) },
-							onMenuAction = onMenuAction,
-							showOnlyThumbnail = false
-						)
+							val contentIdx = if (showAds) NativeAdPlacer.contentIndexFor(position) else position
+							val video = runCatching { pagingItems[contentIdx] }.getOrNull()
+							if (video == null) {
+								VideoGridSkeleton()
+							} else {
+							VideoGridItem(
+								video = video,
+								onClick = { onVideoClick(video.id) },
+								onFavoriteClick = { onFavoriteClick(video.id) },
+								onMenuAction = onMenuAction,
+								showOnlyThumbnail = false
+							)
+							}
 						}
 					}
 				}
@@ -751,19 +792,37 @@ fun VideoContent(
 					contentPadding = PaddingValues(vertical = VideoMaxDimens.spacingSm)
 				) {
 					items(
-						count = pagingItems.itemCount,
-						key = pagingItems.itemKey { it.id }
-					) { index ->
-						val video = pagingItems[index]
-						if (video == null) {
-							VideoListSkeleton()
+						count = totalCount,
+						key = { position ->
+							if (showAds && NativeAdPlacer.isAdPosition(position)) {
+								"native_ad_$position"
+							} else {
+								// Idem grilla: peek con fallback posicional anti-FATAL.
+								val contentIdx = if (showAds) NativeAdPlacer.contentIndexFor(position) else position
+								runCatching {
+									videoKey(contentIdx)
+								}.getOrNull() ?: "video_pos_$contentIdx"
+							}
+						},
+						contentType = { position ->
+							if (showAds && NativeAdPlacer.isAdPosition(position)) "native_ad" else "video"
+						}
+					) { position ->
+						if (showAds && NativeAdPlacer.isAdPosition(position)) {
+							NativeAdSlot()
 						} else {
-						VideoListItem(
-							video = video,
-							onClick = { onVideoClick(video.id) },
-							onFavoriteClick = { onFavoriteClick(video.id) },
-							onMenuAction = onMenuAction
-						)
+							val contentIdx = if (showAds) NativeAdPlacer.contentIndexFor(position) else position
+							val video = runCatching { pagingItems[contentIdx] }.getOrNull()
+							if (video == null) {
+								VideoListSkeleton()
+							} else {
+							VideoListItem(
+								video = video,
+								onClick = { onVideoClick(video.id) },
+								onFavoriteClick = { onFavoriteClick(video.id) },
+								onMenuAction = onMenuAction
+							)
+							}
 						}
 					}
 				}

@@ -23,8 +23,6 @@ class SettingsRepositoryImpl @Inject constructor(
 
 	override suspend fun setMusicSortOption(option: MusicSortOption) = dataStore.setMusicSortOption(option)
 
-	override suspend fun setAccentColor(color: Long) = dataStore.setAccentColor(color)
-
 	override suspend fun setDefaultPlaybackSpeed(speed: Float) =
 		dataStore.setDefaultPlaybackSpeed(speed)
 
@@ -50,4 +48,6 @@ class SettingsRepositoryImpl @Inject constructor(
 	override suspend fun setPrivateVideoIds(ids: List<Long>) = dataStore.setPrivateVideoIds(ids)
 
 	override suspend fun setTermsAccepted(accepted: Boolean) = dataStore.setTermsAccepted(accepted)
+	override suspend fun addFailedVideoId(videoId: Long) = dataStore.addFailedVideoId(videoId)
+	override suspend fun removeFailedVideoId(videoId: Long) = dataStore.removeFailedVideoId(videoId)
 }

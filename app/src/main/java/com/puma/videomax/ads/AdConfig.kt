@@ -3,6 +3,7 @@ package com.puma.videomax.ads
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import com.google.android.gms.ads.AdSize
+import com.puma.videomax.BuildConfig
 
 object AdConfig {
 
@@ -15,38 +16,37 @@ object AdConfig {
     private const val TEST_APP_OPEN = "ca-app-pub-3940256099942544/9257395921"
 
     private const val PRODUCTION_BANNER = "ca-app-pub-7120145882116895/6968706325"
-    private const val PRODUCTION_INTERSTITIAL = ""
+    private const val PRODUCTION_INTERSTITIAL = "ca-app-pub-7120145882116895/7221771000"
     private const val PRODUCTION_REWARDED = "ca-app-pub-7120145882116895/9730601032"
-    private const val PRODUCTION_NATIVE = ""
-    private const val PRODUCTION_APP_OPEN = ""
+    private const val PRODUCTION_NATIVE = "ca-app-pub-7120145882116895/8888826456"
+    private const val PRODUCTION_APP_OPEN = "ca-app-pub-7120145882116895/4784873029"
 
-    private var debugOverride: Boolean = false
+    /** Test ads in debug, real production IDs in release. */
+    val useTestAds: Boolean get() = BuildConfig.DEBUG
 
     fun init(context: Context) {
-        debugOverride = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        // Reserved for future use
     }
 
-    val useTestAds: Boolean get() = debugOverride
-
     fun getBannerAdSize(context: Context): AdSize {
-        val displayMetrics = context.resources.displayMetrics
-        val adWidthPixels = displayMetrics.widthPixels
-        val adWidth = (adWidthPixels / displayMetrics.density).toInt()
-        return AdSize.getInlineAdaptiveBannerAdSize(adWidth, 90)
+        return AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(
+            context,
+            (context.resources.displayMetrics.widthPixels / context.resources.displayMetrics.density).toInt()
+        )
     }
 
     val bannerAdUnitId: String
-        get() = if (debugOverride) TEST_BANNER else PRODUCTION_BANNER
+        get() = if (useTestAds) TEST_BANNER else PRODUCTION_BANNER
 
     val interstitialAdUnitId: String
-        get() = if (debugOverride) TEST_INTERSTITIAL else PRODUCTION_INTERSTITIAL
+        get() = if (useTestAds) TEST_INTERSTITIAL else PRODUCTION_INTERSTITIAL
 
     val rewardedAdUnitId: String
-        get() = if (debugOverride) TEST_REWARDED else PRODUCTION_REWARDED
+        get() = if (useTestAds) TEST_REWARDED else PRODUCTION_REWARDED
 
     val nativeAdUnitId: String
-        get() = if (debugOverride) TEST_NATIVE else PRODUCTION_NATIVE
+        get() = if (useTestAds) TEST_NATIVE else PRODUCTION_NATIVE
 
     val appOpenAdUnitId: String
-        get() = if (debugOverride) TEST_APP_OPEN else PRODUCTION_APP_OPEN
+        get() = if (useTestAds) TEST_APP_OPEN else PRODUCTION_APP_OPEN
 }

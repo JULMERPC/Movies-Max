@@ -320,6 +320,14 @@ interface VideoDao {
 	@Query("UPDATE videos SET isFavorite = :isFavorite WHERE id = :videoId")
 	suspend fun updateFavorite(videoId: Long, isFavorite: Boolean)
 
+	/**
+	 * Atomic flip in a single statement: no read-then-write race on rapid
+	 * double taps, and a single failure point the repository can guard so a
+	 * heart tap can never crash the app.
+	 */
+	@Query("UPDATE videos SET isFavorite = NOT isFavorite WHERE id = :videoId")
+	suspend fun toggleFavorite(videoId: Long)
+
 	@Query("SELECT isFavorite FROM videos WHERE id = :videoId LIMIT 1")
 	suspend fun isFavorite(videoId: Long): Boolean?
 

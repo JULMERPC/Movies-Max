@@ -5,6 +5,8 @@ plugins {
 	alias(libs.plugins.ksp)
 }
 
+import java.util.Properties
+
 android {
 	namespace = "com.puma.videomax"
 	compileSdk {
@@ -17,13 +19,32 @@ android {
 		applicationId = "com.puma.videomax"
 		minSdk = 26
 		targetSdk = 36
-		versionCode = 9
-		versionName = "0.9.1"
+		versionCode = 16
+		versionName = "1.0.3"
 
 		testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
 		vectorDrawables {
 			useSupportLibrary = true
+		}
+	}
+
+	val uploadProps = Properties().apply {
+		rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use(::load)
+	}
+	val uploadStoreFile = uploadProps.getProperty("upload.storeFile")?.let { rootProject.file(it) }
+		?.takeIf { it.exists() }
+
+	signingConfigs {
+		maybeCreate("release")
+		getByName("release") {
+			// Upload key loaded from local.properties (never committed).
+			if (uploadStoreFile != null) {
+				storeFile = uploadStoreFile
+				storePassword = uploadProps.getProperty("upload.storePassword")
+				keyAlias = uploadProps.getProperty("upload.keyAlias")
+				keyPassword = uploadProps.getProperty("upload.keyPassword")
+			}
 		}
 	}
 
@@ -35,6 +56,9 @@ android {
 				getDefaultProguardFile("proguard-android-optimize.txt"),
 				"proguard-rules.pro"
 			)
+			if (uploadStoreFile != null) {
+				signingConfig = signingConfigs.getByName("release")
+			}
 		}
 	}
 
@@ -45,6 +69,7 @@ android {
 
 	buildFeatures {
 		compose = true
+		buildConfig = true
 	}
 
 	packaging {
@@ -90,18 +115,31 @@ dependencies {
 
 	implementation(libs.androidx.datastore.preferences)
 
+	implementation(libs.androidx.media)
+
 	implementation(libs.androidx.media3.exoplayer)
 	implementation(libs.androidx.media3.ui)
 	implementation(libs.androidx.media3.session)
 	implementation(libs.androidx.media3.common)
+	implementation(libs.androidx.media3.decoder)
+	implementation(libs.androidx.media3.exoplayer.dash)
+	implementation(libs.androidx.media3.exoplayer.hls)
 
 	implementation(libs.coil.compose)
 	implementation(libs.coil.video)
 
 	implementation(libs.play.services.ads)
+	implementation(libs.play.review)
 	implementation(libs.user.messaging.platform)
+	implementation(libs.play.billing.ktx)
+	// AdMob mediation (bidding + waterfall): Unity Ads + AppLovin.
+	// Adapters self-initialize with MobileAds.initialize(); no manifest keys needed.
+	implementation(libs.unity.ads)
+	implementation(libs.mediation.unity)
+	implementation(libs.mediation.applovin)
 
 	implementation(libs.kotlinx.coroutines.android)
+	implementation(libs.kotlinx.coroutines.play.services)
 
 	debugImplementation(libs.androidx.compose.ui.tooling)
 

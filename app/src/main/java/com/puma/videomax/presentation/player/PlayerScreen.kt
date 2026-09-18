@@ -93,6 +93,7 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.puma.videomax.domain.model.Video
 import com.puma.videomax.presentation.components.VideoThumbnail
+import com.puma.videomax.service.BackgroundAudioManager
 import com.puma.videomax.presentation.theme.VideoMaxDimens
 import com.puma.videomax.presentation.theme.VideoMaxTheme
 import com.puma.videomax.util.Formatters
@@ -106,6 +107,7 @@ import kotlinx.coroutines.launch
 	viewModel: PlayerViewModel = hiltViewModel()
 ) {
 	val state by viewModel.uiState.collectAsStateWithLifecycle()
+	val reviewViewModel: ReviewTriggerViewModel = hiltViewModel()
 	val context = LocalContext.current
 	val activity = context as Activity
 	val audioManager = remember { context.getSystemService(android.media.AudioManager::class.java) }
@@ -130,8 +132,30 @@ import kotlinx.coroutines.launch
 		}
 	}
 
-	SetupSystemBars(activity, audioManager, viewModel, scope)
+	SetupSystemBars(activity, viewModel, scope)
 	SetupLifecyclePauser(activity, viewModel, state)
+
+	DisposableEffect(Unit) {
+		val wasPlaying = BackgroundAudioManager.isPlaying.value
+		if (wasPlaying) {
+			BackgroundAudioManager.setPlaying(false)
+		}
+		onDispose {
+			if (wasPlaying) {
+				BackgroundAudioManager.setPlaying(true)
+			}
+		}
+	}
+
+	LaunchedEffect(Unit) {
+		viewModel.events.collect { event ->
+			when (event) {
+				is PlayerEvent.TriggerReview -> {
+					reviewViewModel.tryLaunchReview(activity)
+				}
+			}
+		}
+	}
 
 	LaunchedEffect(state.orientation) {
 		activity.requestedOrientation = when (state.orientation) {
@@ -150,11 +174,17 @@ import kotlinx.coroutines.launch
 
 	LaunchedEffect(state.volumeFraction) {
 		val max = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
-		audioManager.setStreamVolume(
-			android.media.AudioManager.STREAM_MUSIC,
-			(state.volumeFraction * max).toInt().coerceIn(0, max),
-			0
-		)
+		val target = (state.volumeFraction * max).toInt().coerceIn(0, max)
+		// Write-back guard: hardware-button changes already arrive via
+		// VolumeStateProvider. Writing the same value would re-trigger the
+		// ContentObserver → recompose → write loop (AudioManager spam).
+		if (audioManager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC) != target) {
+			audioManager.setStreamVolume(
+				android.media.AudioManager.STREAM_MUSIC,
+				target,
+				0
+			)
+		}
 	}
 
 	BackHandler {
@@ -425,7 +455,6 @@ private fun PlayerQueueSheet(
 @Composable
 private fun SetupSystemBars(
 	activity: Activity,
-	audioManager: android.media.AudioManager,
 	viewModel: PlayerViewModel,
 	scope: kotlinx.coroutines.CoroutineScope
 ) {
@@ -439,9 +468,8 @@ private fun SetupSystemBars(
 			WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
 		window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-		val maxVolume = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC).coerceAtLeast(1)
-		val currentVolume = audioManager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
-		viewModel.setVolumeFraction(currentVolume / maxVolume.toFloat(), fromGesture = false)
+		// Volume is synced reactively via VolumeStateProvider -> PlayerViewModel.
+		// No getStreamVolume() polling here (saves one system_server IPC per composition).
 
 		val lp = window.attributes
 		if (lp.screenBrightness >= 0f) {

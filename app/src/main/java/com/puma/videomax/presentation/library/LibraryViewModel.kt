@@ -12,6 +12,7 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.puma.videomax.domain.model.SortOption
 import com.puma.videomax.domain.model.Video
+import com.puma.videomax.domain.monetization.MonetizationRepository
 import com.puma.videomax.domain.repository.PlaylistRepository
 import com.puma.videomax.domain.repository.SettingsRepository
 import com.puma.videomax.domain.repository.VideoRepository
@@ -70,8 +71,18 @@ class LibraryViewModel @Inject constructor(
 	private val videoRepository: VideoRepository,
 	private val settingsRepository: SettingsRepository,
 	private val playlistRepository: PlaylistRepository,
-	private val playbackQueue: PlaybackQueue
+	private val playbackQueue: PlaybackQueue,
+	monetization: MonetizationRepository
 ) : ViewModel() {
+
+	/**
+	 * False con Premium/pase: la lista no reserva slots de nativos (sin huecos
+	 * fantasma con espaciado) y ningún slot carga anuncios. True inicial para
+	 * no parpadear la estructura mientras DataStore resuelve.
+	 */
+	val adsEnabled: StateFlow<Boolean> = monetization.state
+		.map { !it.areAdsRemoved() }
+		.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
 	private val query = MutableStateFlow("")
 	private val sortOption = MutableStateFlow(SortOption.DATE_DESC)
@@ -259,7 +270,7 @@ class LibraryViewModel @Inject constructor(
 	}
 
 	fun onFavorite(videoId: Long) {
-		viewModelScope.launch { toggleFavorite(videoId) }
+		viewModelScope.launch { runCatching { toggleFavorite(videoId) } }
 	}
 
 	fun markVideoSeen(videoId: Long) {

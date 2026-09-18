@@ -3,6 +3,7 @@ package com.puma.videomax.presentation.navigation
 sealed class Screen(val route: String) {
 	data object Library : Screen("library")
 	data object Music : Screen("music")
+	data object Favorites : Screen("favorites")
 	data object Playlists : Screen("playlists")
 	data object Settings : Screen("settings")
 	data object PrivateFolder : Screen("private_folder")

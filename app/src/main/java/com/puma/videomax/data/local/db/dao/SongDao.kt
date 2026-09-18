@@ -568,6 +568,10 @@ interface SongDao {
 	@Query("UPDATE songs SET isFavorite = :isFavorite WHERE id = :songId")
 	suspend fun updateFavorite(songId: Long, isFavorite: Boolean)
 
+	/** Atomic flip (see VideoDao.toggleFavorite): single statement, no races. */
+	@Query("UPDATE songs SET isFavorite = NOT isFavorite WHERE id = :songId")
+	suspend fun toggleFavorite(songId: Long)
+
 	@Query("SELECT isFavorite FROM songs WHERE id = :songId LIMIT 1")
 	suspend fun isFavorite(songId: Long): Boolean?
 

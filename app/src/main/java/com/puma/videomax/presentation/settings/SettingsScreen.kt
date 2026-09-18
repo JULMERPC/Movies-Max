@@ -1,68 +1,55 @@
 package com.puma.videomax.presentation.settings
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Gesture
-import androidx.compose.material.icons.filled.HideImage
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -85,7 +72,7 @@ import com.puma.videomax.domain.model.ThemeMode
 import com.puma.videomax.util.Formatters
 import com.puma.videomax.presentation.theme.VideoMaxDimens
 import com.puma.videomax.presentation.theme.VideoMaxTheme
-import com.puma.videomax.presentation.theme.screenGradient
+import com.puma.videomax.presentation.theme.screenColor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,13 +82,24 @@ fun SettingsScreen(
 	onOpenSupportDeveloper: () -> Unit = {}
 ) {
 	val settings by viewModel.settings.collectAsStateWithLifecycle()
+	val monetization by viewModel.monetizationState.collectAsStateWithLifecycle()
+	val removeAdsPrice by viewModel.removeAdsPrice.collectAsStateWithLifecycle()
+	val purchaseMessage by viewModel.purchaseMessage.collectAsStateWithLifecycle()
 	val consentManager = LocalConsentManager.current
 	val activity = LocalActivity.current
+	val snackbarHostState = remember { SnackbarHostState() }
+
+	LaunchedEffect(purchaseMessage) {
+		purchaseMessage?.let {
+			snackbarHostState.showSnackbar(it)
+			viewModel.clearPurchaseMessage()
+		}
+	}
 
 	Box(
 		modifier = Modifier
 			.fillMaxSize()
-			.background(screenGradient())
+			.background(screenColor())
 	) {
 		Column(modifier = Modifier.fillMaxSize()) {
 			TopAppBar(
@@ -127,32 +125,41 @@ fun SettingsScreen(
 			) {
 				Spacer(modifier = Modifier.height(VideoMaxDimens.spacingXs))
 
-				SettingsCard(
-					title = "Apoya al desarrollador",
-					icon = Icons.Default.Favorite
-				) {
+			SettingsCard(
+				title = "Apoya al desarrollador",
+				icon = Icons.Default.Favorite
+			) {
+				SettingsClickableRow(
+					title = "Apoya el desarrollo de Jualix",
+					subtitle = "Viendo un anuncio voluntario",
+					icon = Icons.Default.Favorite,
+					onClick = onOpenSupportDeveloper
+				)
+				if (monetization.isPremium) {
 					SettingsClickableRow(
-						title = "Apoya el desarrollo de Jualix",
-						subtitle = "Viendo un anuncio voluntario",
-						icon = Icons.Default.Favorite,
-						onClick = onOpenSupportDeveloper
+						title = "Jualix Premium activo",
+						subtitle = "Disfrutás la app sin anuncios",
+						icon = Icons.Default.Check,
+						onClick = {}
+					)
+				} else {
+					PremiumOfferCard(
+						price = removeAdsPrice,
+						onBuy = { activity?.let { viewModel.buyRemoveAds(it) } },
+						onRestore = { viewModel.restorePurchases() }
 					)
 				}
+			}
 
-				SettingsCard(
-					title = stringResource(R.string.settings_appearance),
-					icon = Icons.Default.Gesture
-				) {
-					ThemeDropdown(
-						selected = settings.themeMode,
-						onSelected = viewModel::setTheme
-					)
-					Spacer(modifier = Modifier.height(VideoMaxDimens.spacingSm))
-					ColorPickerRow(
-						selectedColor = settings.accentColor,
-						onColorSelected = viewModel::setAccentColor
-					)
-				}
+			SettingsCard(
+				title = stringResource(R.string.settings_appearance),
+				icon = Icons.Default.Gesture
+			) {
+				ThemeDropdown(
+					selected = settings.themeMode,
+					onSelected = viewModel::setTheme
+				)
+			}
 
 				SettingsCard(
 					title = stringResource(R.string.settings_playback),
@@ -233,17 +240,17 @@ fun SettingsScreen(
 				)
 			}
 
-			SettingsCard(
-				title = "Privacidad",
-				icon = Icons.Default.Lock
-			) {
-				SettingsClickableRow(
-					title = "Configuración de privacidad",
-					subtitle = "Administrar tus preferencias de consentimiento",
-					icon = Icons.Default.Lock,
-					onClick = { activity?.let { consentManager.showPrivacyOptionsForm(it) } }
-				)
-			}
+//			SettingsCard(
+//				title = "Privacidad",
+//				icon = Icons.Default.Lock
+//			) {
+//				SettingsClickableRow(
+//					title = "Configuración de privacidad",
+//					subtitle = "Administrar tus preferencias de consentimiento",
+//					icon = Icons.Default.Lock,
+//					onClick = { activity?.let { consentManager.showPrivacyOptionsForm(it) } }
+//				)
+//			}
 
 			SettingsCard(
 				title = stringResource(R.string.settings_about),
@@ -269,6 +276,109 @@ fun SettingsScreen(
 				}
 
 				Spacer(modifier = Modifier.height(VideoMaxDimens.spacingXxxl))
+			}
+		}
+		SnackbarHost(
+			hostState = snackbarHostState,
+			modifier = Modifier.align(Alignment.BottomCenter)
+		)
+	}
+}
+
+@Composable
+private fun PremiumOfferCard(
+	price: String?,
+	onBuy: () -> Unit,
+	onRestore: () -> Unit
+) {
+	// Oferta única: dorado real, badge de escasez, precio grande y CTA.
+	// Nada de fila plana: tiene que gritar "pago único".
+	Card(
+		modifier = Modifier.fillMaxWidth(),
+		shape = RoundedCornerShape(20.dp),
+		colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+		elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+	) {
+		Box(
+			modifier = Modifier
+				.fillMaxWidth()
+				.background(
+					Brush.linearGradient(
+						colors = listOf(
+							Color(0xFFB26A00),
+							Color(0xFFFF9800),
+							Color(0xFFFFD54F)
+						)
+					)
+				)
+				.padding(VideoMaxDimens.spacingLg)
+		) {
+			Column {
+				Row(verticalAlignment = Alignment.CenterVertically) {
+					Box(
+						modifier = Modifier
+							.clip(RoundedCornerShape(VideoMaxDimens.radiusFull))
+							.background(Color(0xFF1A1A1A))
+							.padding(horizontal = 10.dp, vertical = 4.dp)
+					) {
+						Text(
+							text = "★ OFERTA ÚNICA",
+							style = MaterialTheme.typography.labelSmall,
+							fontWeight = FontWeight.Bold,
+							color = Color(0xFFFFD54F)
+						)
+					}
+					Spacer(modifier = Modifier.weight(1f))
+					Icon(
+						imageVector = Icons.Default.WorkspacePremium,
+						contentDescription = null,
+						tint = Color.White,
+						modifier = Modifier.size(32.dp)
+					)
+				}
+				Spacer(modifier = Modifier.height(VideoMaxDimens.spacingSm))
+				Text(
+					text = "Sin anuncios. Para siempre.",
+					style = MaterialTheme.typography.headlineSmall,
+					fontWeight = FontWeight.Bold,
+					color = Color.White
+				)
+				Text(
+					text = "Un solo pago · sin suscripciones · tuyo de por vida",
+					style = MaterialTheme.typography.bodyMedium,
+					color = Color.White.copy(alpha = 0.9f)
+				)
+				Spacer(modifier = Modifier.height(VideoMaxDimens.spacingMd))
+				Row(verticalAlignment = Alignment.CenterVertically) {
+					Text(
+						text = price ?: "…",
+						style = MaterialTheme.typography.displaySmall,
+						fontWeight = FontWeight.Bold,
+						color = Color.White,
+						modifier = Modifier.weight(1f)
+					)
+					Button(
+						onClick = onBuy,
+						colors = ButtonDefaults.buttonColors(
+							containerColor = Color(0xFF1A1A1A),
+							contentColor = Color(0xFFFFD54F)
+						),
+						shape = RoundedCornerShape(VideoMaxDimens.radiusMd)
+					) {
+						Text("Quitar anuncios", fontWeight = FontWeight.Bold)
+					}
+				}
+				Spacer(modifier = Modifier.height(VideoMaxDimens.spacingSm))
+				Text(
+					text = "¿Ya la compraste? Restaurar compra",
+					style = MaterialTheme.typography.bodyMedium,
+					fontWeight = FontWeight.SemiBold,
+					color = Color.White,
+					modifier = Modifier
+						.clip(RoundedCornerShape(VideoMaxDimens.radiusMd))
+						.clickable(onClick = onRestore)
+						.padding(vertical = VideoMaxDimens.spacingXs, horizontal = VideoMaxDimens.spacingSm)
+				)
 			}
 		}
 	}
@@ -487,125 +597,5 @@ private fun ThemeDropdown(
 				)
 			}
 		}
-	}
-}
-
-@Composable
-private fun ColorPickerRow(
-	selectedColor: Long,
-	onColorSelected: (Long) -> Unit
-) {
-	var showPicker by remember { mutableStateOf(false) }
-
-	val presetColors = listOf(
-		0xFFFFFFFFL,
-		0xFF006B5EL,
-		0xFFE91E63L,
-		0xFF2196F3L,
-		0xFFFF9800L,
-		0xFF9C27B0L
-	)
-
-	Row(
-		modifier = Modifier
-			.fillMaxWidth()
-			.clip(RoundedCornerShape(VideoMaxDimens.radiusMd))
-			.clickable { showPicker = true }
-			.padding(vertical = VideoMaxDimens.spacingSm, horizontal = VideoMaxDimens.spacingXs),
-		verticalAlignment = Alignment.CenterVertically
-	) {
-		Text(
-			"Tu color favorito",
-			style = MaterialTheme.typography.bodyLarge,
-			color = VideoMaxTheme.extended.textPrimary,
-			modifier = Modifier.weight(1f)
-		)
-		Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-			presetColors.take(4).forEach { color ->
-				Box(
-					modifier = Modifier
-						.size(24.dp)
-						.clip(CircleShape)
-						.background(Color(color.toInt()))
-						.then(
-							if (selectedColor == color) Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-							else if (color == 0xFFFFFFFFL) Modifier.border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
-							else Modifier
-						)
-				)
-			}
-			if (selectedColor != 0L && selectedColor !in presetColors.take(4)) {
-				Box(
-					modifier = Modifier
-						.size(24.dp)
-						.clip(CircleShape)
-						.background(Color(selectedColor.toInt()))
-						.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-				)
-			}
-		}
-		Spacer(modifier = Modifier.width(VideoMaxDimens.spacingSm))
-		Icon(
-			imageVector = Icons.Default.ChevronRight,
-			contentDescription = null,
-			tint = VideoMaxTheme.extended.textTertiary,
-			modifier = Modifier.size(20.dp)
-		)
-	}
-
-	if (showPicker) {
-		AlertDialog(
-			onDismissRequest = { showPicker = false },
-			title = { Text("Elegí tu color") },
-			text = {
-				Column {
-					Box(
-						modifier = Modifier
-							.fillMaxWidth()
-							.height(44.dp)
-							.clip(RoundedCornerShape(VideoMaxDimens.radiusMd))
-							.background(MaterialTheme.colorScheme.primary)
-							.clickable {
-								onColorSelected(0L)
-								showPicker = false
-							},
-						contentAlignment = Alignment.Center
-					) {
-						Text("Por defecto", color = MaterialTheme.colorScheme.onPrimary)
-					}
-					Spacer(modifier = Modifier.height(VideoMaxDimens.spacingMd))
-					LazyVerticalGrid(
-						columns = GridCells.Fixed(4),
-						horizontalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingSm),
-						verticalArrangement = Arrangement.spacedBy(VideoMaxDimens.spacingSm)
-					) {
-						items(presetColors) { color ->
-							val isSelected = selectedColor == color
-							Box(
-								modifier = Modifier
-									.aspectRatio(1f)
-									.clip(RoundedCornerShape(VideoMaxDimens.radiusSm))
-									.background(Color(color.toInt()))
-									.then(
-										if (isSelected) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, RoundedCornerShape(VideoMaxDimens.radiusSm))
-										else if (color == 0xFFFFFFFFL) Modifier.border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(VideoMaxDimens.radiusSm))
-										else Modifier
-									)
-									.clickable {
-										onColorSelected(color)
-										showPicker = false
-									}
-							)
-						}
-					}
-				}
-			},
-			confirmButton = {},
-			dismissButton = {
-				TextButton(onClick = { showPicker = false }) {
-					Text("Cerrar")
-				}
-			}
-		)
 	}
 }

@@ -15,6 +15,10 @@ import com.puma.videomax.data.repository.PlaylistRepositoryImpl
 import com.puma.videomax.data.repository.SettingsRepositoryImpl
 import com.puma.videomax.data.repository.SongRepositoryImpl
 import com.puma.videomax.data.repository.VideoRepositoryImpl
+import com.puma.videomax.billing.PlayBillingPremiumDataSource
+import com.puma.videomax.billing.PremiumDataSource
+import com.puma.videomax.data.monetization.MonetizationRepositoryImpl
+import com.puma.videomax.domain.monetization.MonetizationRepository
 import com.puma.videomax.domain.repository.FavoritesRepository
 import com.puma.videomax.domain.repository.HistoryRepository
 import com.puma.videomax.domain.repository.PlaylistRepository
@@ -48,21 +52,27 @@ object DatabaseModule {
 			.build()
 
 	@Provides
+	@Singleton
 	fun provideVideoDao(db: VideoDatabase): VideoDao = db.videoDao()
 
 	@Provides
+	@Singleton
 	fun providePlaylistDao(db: VideoDatabase): PlaylistDao = db.playlistDao()
 
 	@Provides
+	@Singleton
 	fun provideHistoryDao(db: VideoDatabase): HistoryDao = db.historyDao()
 
 	@Provides
+	@Singleton
 	fun provideSongDao(db: VideoDatabase): SongDao = db.songDao()
 
 	@Provides
+	@Singleton
 	fun provideSongStatsDao(db: VideoDatabase): SongStatsDao = db.songStatsDao()
 
 	@Provides
+	@Singleton
 	fun provideMusicQueueDao(db: VideoDatabase): MusicQueueDao = db.musicQueueDao()
 }
 
@@ -93,4 +103,16 @@ abstract class RepositoryModule {
 	@Binds
 	@Singleton
 	abstract fun bindSongRepository(impl: SongRepositoryImpl): SongRepository
+
+	@Binds
+	@Singleton
+	abstract fun bindMonetizationRepository(
+		impl: MonetizationRepositoryImpl
+	): MonetizationRepository
+
+	@Binds
+	@Singleton
+	abstract fun bindPremiumDataSource(
+		impl: PlayBillingPremiumDataSource
+	): PremiumDataSource
 }

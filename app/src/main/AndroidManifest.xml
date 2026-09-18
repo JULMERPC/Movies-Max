@@ -11,6 +11,9 @@
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+	<!-- Google Play Billing: la lib billing-ktx ya lo fusiona, se declara
+		explícito para que el flujo de compra nunca quede sin permiso. -->
+	<uses-permission android:name="com.android.vending.BILLING" />
 
 	<application
 		android:name=".VideoPlayerProApp"
@@ -22,6 +25,7 @@
 		android:roundIcon="@mipmap/ic_launcher_round"
 		android:supportsRtl="true"
 		android:theme="@style/Theme.VideoPlayerPro"
+		android:enableOnBackInvokedCallback="true"
 		tools:targetApi="36">
 
 		<meta-data
@@ -51,6 +55,10 @@
 		<service
 			android:name=".service.BackgroundAudioService"
 			android:exported="false"
-			android:foregroundServiceType="mediaPlayback" />
+			android:foregroundServiceType="mediaPlayback">
+			<intent-filter>
+				<action android:name="android.intent.action.MEDIA_BUTTON" />
+			</intent-filter>
+		</service>
 	</application>
 </manifest>

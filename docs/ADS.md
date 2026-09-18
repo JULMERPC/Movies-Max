@@ -197,6 +197,40 @@ In Google Play Console > App content > Data safety, declare:
 | DEBUG EEA | Active only in DEBUG builds |
 | Consent form | Published in AdMob |
 
+## Mediation (Unity Ads + AppLovin)
+
+Dependencies (verified against GMA SDK 25.4.0):
+
+| Network | SDK | Adapter |
+|---|---|---|
+| Unity Ads | `com.unity3d.ads:unity-ads:4.20.0` | `com.google.ads.mediation:unity:4.20.0.1` |
+| AppLovin | (bundled in adapter) | `com.google.ads.mediation:applovin:13.6.4.1` |
+
+- Adapters self-initialize inside `MobileAds.initialize()` — no manifest
+  keys, no manual init calls.
+- Debug diagnostics: `MediationLogger` (tag `Mediation`, DEBUG builds only).
+  `adb logcat -s Mediation` shows adapter init states at startup and the
+  winning network (`LOADED <placement> via <adapter>`) plus the full
+  bidding/waterfall chain per loaded ad.
+- Meta Audience Network is intentionally excluded: declining fill,
+  extra SDK weight, and overlapping privacy surface for little gain.
+
+### AdMob console checklist (per ad unit: interstitial, rewarded, native)
+
+1. **Mediation > Create mediation group** (one group can cover all 3
+   formats, or one group per format for separate eCPM floors).
+2. **Bidding (preferred)**: Add ad source > **AppLovin** >
+   Acknowledge & agree > enter SDK Key (AppLovin dashboard > Account >
+   Keys). Repeat for **Unity Ads** with your Unity Game ID.
+3. **Waterfall (fallback)**: Add ad source > AppLovin/Unity >
+   enter SDK Key + Zone/Placement IDs > set manual eCPM, ordered high
+   to low, AdMob network on top or by historical eCPM.
+4. Enable **Optimize** (ad source optimization) per network so AdMob
+   auto-tunes eCPM from history.
+5. Wait ~24h, then verify in AdMob > Mediation > group > Ad sources
+   that requests/impressions flow to Unity/AppLovin, and cross-check
+   with `adb logcat -s Mediation` on a debug build.
+
 ## Troubleshooting
 
 - **Banner not showing**: Check Logcat for `BannerAd` tag. Ensure device has

@@ -65,7 +65,7 @@ import com.puma.videomax.presentation.components.VideoThumbnail
 import com.puma.videomax.presentation.navigation.Screen
 import com.puma.videomax.presentation.theme.VideoMaxDimens
 import com.puma.videomax.presentation.theme.VideoMaxTheme
-import com.puma.videomax.presentation.theme.screenGradient
+import com.puma.videomax.presentation.theme.screenColor
 import com.puma.videomax.util.Formatters
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -73,17 +73,17 @@ import com.puma.videomax.util.Formatters
 fun PlaylistsScreen(
 	onOpenPlaylist: (Long) -> Unit,
 	onOpenSmart: (String) -> Unit,
+	onOpenFavorites: () -> Unit,
 	viewModel: PlaylistsViewModel = hiltViewModel()
 ) {
 	val playlists by viewModel.playlists.collectAsStateWithLifecycle()
-	val favoritesCount by viewModel.favoritesCount.collectAsStateWithLifecycle()
 	val historyCount by viewModel.historyCount.collectAsStateWithLifecycle()
 	val mostPlayedCount by viewModel.mostPlayedCount.collectAsStateWithLifecycle()
 	var showDialog by remember { mutableStateOf(false) }
 	var name by remember { mutableStateOf("") }
 
 	val smartCategories = listOf(
-		SmartCategory(Screen.SmartCollection.FAVORITES, "Favoritos", "$favoritesCount videos", Icons.Default.Favorite),
+		SmartCategory(Screen.SmartCollection.FAVORITES, "Favoritos", "Videos y música", Icons.Default.Favorite),
 		SmartCategory(Screen.SmartCollection.HISTORY, "Historial", "$historyCount vistos", Icons.Default.History),
 		SmartCategory(Screen.SmartCollection.MOST_PLAYED, "Mas reproducidos", "$mostPlayedCount videos", Icons.Default.Whatshot),
 		SmartCategory(Screen.SmartCollection.RECENT, "Vistos recientemente", "Seguir viendo", Icons.Default.History),
@@ -93,7 +93,7 @@ fun PlaylistsScreen(
 	Box(
 		modifier = Modifier
 			.fillMaxSize()
-			.background(screenGradient())
+			.background(screenColor())
 	) {
 		Column(modifier = Modifier.fillMaxSize()) {
 			TopAppBar(
@@ -128,7 +128,15 @@ fun PlaylistsScreen(
 					)
 				}
 				items(smartCategories, key = { it.type }) { category ->
-					SmartCategoryCard(category = category, onClick = { onOpenSmart(category.type) })
+					// Favoritos abre la pantalla unificada Videos/Música; el resto
+					// sigue a colecciones inteligentes.
+					SmartCategoryCard(
+						category = category,
+						onClick = {
+							if (category.type == Screen.SmartCollection.FAVORITES) onOpenFavorites()
+							else onOpenSmart(category.type)
+						}
+					)
 				}
 				item {
 					Spacer(modifier = Modifier.height(VideoMaxDimens.spacingSm))
@@ -266,7 +274,7 @@ fun SmartCollectionScreen(
 	Box(
 		modifier = Modifier
 			.fillMaxSize()
-			.background(screenGradient())
+			.background(screenColor())
 	) {
 		Column(modifier = Modifier.fillMaxSize()) {
 			TopAppBar(
@@ -432,7 +440,7 @@ fun PlaylistDetailScreen(
 	Box(
 		modifier = Modifier
 			.fillMaxSize()
-			.background(screenGradient())
+			.background(screenColor())
 	) {
 		Column(modifier = Modifier.fillMaxSize()) {
 			TopAppBar(

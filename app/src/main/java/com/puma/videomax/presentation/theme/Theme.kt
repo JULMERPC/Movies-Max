@@ -1,7 +1,6 @@
 package com.puma.videomax.presentation.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
@@ -13,7 +12,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.unit.dp
 import com.puma.videomax.domain.model.ThemeMode
 
@@ -41,8 +39,6 @@ val LocalExtendedColors = staticCompositionLocalOf {
 		overlay = Color.Unspecified
 	)
 }
-
-val LocalAccentColor = staticCompositionLocalOf { Color.Unspecified }
 
 private val LightExtended = ExtendedColors(
 	surfaceGlass = Color(0x0D000000),
@@ -160,13 +156,9 @@ private val AppShapes = Shapes(
 	extraLarge = RoundedCornerShape(28.dp)
 )
 
-private fun Color.alphaBlendWithBase(alphaFraction: Float, base: Color): Color =
-	Color(this.red, this.green, this.blue, alphaFraction).compositeOver(base)
-
 @Composable
 fun VideoPlayerProTheme(
 	themeMode: ThemeMode = ThemeMode.SYSTEM,
-	accentColor: Long = 0L,
 	content: @Composable () -> Unit
 ) {
 	val darkTheme = when (themeMode) {
@@ -188,14 +180,14 @@ fun VideoPlayerProTheme(
 		else -> LightExtended
 	}
 
-	val scaffoldColor = if (isAmoled) Color.Black
-		else colors.primary.alphaBlendWithBase(60f / 255f, if (darkTheme) Color.Black else Color.White)
-
-	val resolvedAccent = if (accentColor != 0L) Color(accentColor.toInt()) else colors.primary
+	val scaffoldColor = when {
+		isAmoled -> Color.Black
+		darkTheme -> Color(0xFF0E1514)
+		else -> Color.White
+	}
 
 	CompositionLocalProvider(
-		LocalExtendedColors provides extendedColors,
-		LocalAccentColor provides resolvedAccent
+		LocalExtendedColors provides extendedColors
 	) {
 		MaterialTheme(
 			colorScheme = colors.copy(

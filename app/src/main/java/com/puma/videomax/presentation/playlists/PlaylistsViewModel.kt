@@ -123,7 +123,7 @@ class SmartCollectionViewModel @Inject constructor(
 	}
 
 	fun toggleFavorite(videoId: Long) {
-		viewModelScope.launch { toggleFavorite(videoId) }
+		viewModelScope.launch { runCatching { toggleFavorite(videoId) } }
 	}
 
 	fun clearHistory() {

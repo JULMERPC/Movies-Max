@@ -1,7 +1,6 @@
 package com.puma.videomax.ads
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -19,11 +18,6 @@ class AdConfigTest {
     }
 
     @Test
-    fun `useTestAds defaults to false without init`() {
-        assertFalse(AdConfig.useTestAds)
-    }
-
-    @Test
     fun `banner ad unit ID is not empty`() {
         assertNotNull(AdConfig.bannerAdUnitId)
         assertTrue(AdConfig.bannerAdUnitId.isNotEmpty())
@@ -35,29 +29,46 @@ class AdConfigTest {
     }
 
     @Test
+    fun `interstitial ad unit ID is not empty`() {
+        assertTrue(AdConfig.interstitialAdUnitId.isNotEmpty())
+    }
+
+    @Test
     fun `rewarded ad unit ID is not empty`() {
         assertTrue(AdConfig.rewardedAdUnitId.isNotEmpty())
     }
 
     @Test
-    fun `rewarded ad unit ID has correct format`() {
-        assertTrue(AdConfig.rewardedAdUnitId.startsWith("ca-app-pub-"))
+    fun `app open ad unit ID is not empty`() {
+        assertTrue(AdConfig.appOpenAdUnitId.isNotEmpty())
     }
 
     @Test
-    fun `production banner ID matches expected`() {
-        assertEquals("ca-app-pub-7120145882116895/6968706325", AdConfig.bannerAdUnitId)
+    fun `native ad unit ID has correct format`() {
+        assertTrue(AdConfig.nativeAdUnitId.startsWith("ca-app-pub-"))
     }
 
     @Test
-    fun `production rewarded ID matches expected`() {
-        assertEquals("ca-app-pub-7120145882116895/9730601032", AdConfig.rewardedAdUnitId)
+    fun `banner ID matches the active mode`() {
+        val expected = if (AdConfig.useTestAds) {
+            "ca-app-pub-3940256099942544/6300978111"
+        } else {
+            "ca-app-pub-7120145882116895/6968706325"
+        }
+        assertEquals(expected, AdConfig.bannerAdUnitId)
     }
 
     @Test
-    fun `production IDs use the correct publisher ID`() {
-        val productionPublisherId = "7120145882116895"
-        assertTrue(AdConfig.bannerAdUnitId.contains(productionPublisherId))
-        assertTrue(AdConfig.rewardedAdUnitId.contains(productionPublisherId))
+    fun `all IDs use the publisher of the active mode`() {
+        val publisherId = if (AdConfig.useTestAds) "3940256099942544" else "7120145882116895"
+        listOf(
+            AdConfig.bannerAdUnitId,
+            AdConfig.interstitialAdUnitId,
+            AdConfig.rewardedAdUnitId,
+            AdConfig.nativeAdUnitId,
+            AdConfig.appOpenAdUnitId
+        ).forEach { id ->
+            assertTrue("ID $id should belong to publisher $publisherId", id.contains(publisherId))
+        }
     }
 }

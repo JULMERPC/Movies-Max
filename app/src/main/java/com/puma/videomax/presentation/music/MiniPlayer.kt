@@ -48,7 +48,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -66,6 +65,7 @@ import com.puma.videomax.util.Formatters
 fun MiniPlayer(
 	onOpenFullPlayer: () -> Unit,
 	onClose: () -> Unit,
+	isVisible: Boolean = true,
 	modifier: Modifier = Modifier
 ) {
 	val currentIndex by BackgroundAudioManager.currentIndex.collectAsState()
@@ -77,7 +77,7 @@ fun MiniPlayer(
 	val isShuffleEnabled by BackgroundAudioManager.isShuffleEnabled.collectAsState()
 
 	val current = if (currentIndex in queue.indices) queue[currentIndex] else null
-	val isVisible = current != null
+	val showPlayer = isVisible && current != null
 
 	val interactionSource = remember { MutableInteractionSource() }
 	val isDragging by interactionSource.collectIsDraggedAsState()
@@ -87,7 +87,7 @@ fun MiniPlayer(
 	val displayPosition = if (isDragActive) dragPosition.toLong() else currentPosition
 
 	AnimatedVisibility(
-		visible = isVisible,
+		visible = showPlayer,
 		enter = slideInVertically(
 			initialOffsetY = { it },
 			animationSpec = tween(VideoMaxDimens.animationNormal)
@@ -126,6 +126,8 @@ fun MiniPlayer(
 				) {
 					AlbumArt(
 						albumId = item.albumId,
+						fallbackSeed = item.videoId,
+						fallbackLabel = item.displayName,
 						modifier = Modifier
 							.size(40.dp)
 							.clip(RoundedCornerShape(VideoMaxDimens.radiusSm))
@@ -310,11 +312,14 @@ private fun cycleMode() {
 @Composable
 private fun AlbumArt(
 	albumId: Long,
+	fallbackSeed: Long = albumId,
+	fallbackLabel: String = "",
 	modifier: Modifier = Modifier
 ) {
 	val context = LocalContext.current
+	var failed by remember(albumId) { mutableStateOf(false) }
 
-	if (albumId > 0) {
+	if (albumId > 0 && !failed) {
 		val albumArtUri = Uri.parse("content://media/external/audio/albumart/$albumId")
 
 		AsyncImage(
@@ -324,28 +329,34 @@ private fun AlbumArt(
 				.build(),
 			contentDescription = "Portada del álbum",
 			contentScale = ContentScale.Crop,
+			onError = { failed = true },
 			modifier = modifier
 				.background(MaterialTheme.colorScheme.surfaceContainerHighest)
 		)
-	} else {
+	}
+	if (albumId <= 0 || failed) {
+		// Hash-based fallback so Downloads/uncached tracks never render blank.
+		val tint = MaterialTheme.colorScheme.primaryContainer.copy(
+			red = ((fallbackSeed.hashCode() and 0xFF) / 255f * 0.25f + 0.55f).coerceIn(0f, 1f)
+		)
 		Box(
-			modifier = modifier
-				.background(
-					brush = Brush.linearGradient(
-						colors = listOf(
-							MaterialTheme.colorScheme.primaryContainer,
-							MaterialTheme.colorScheme.secondaryContainer
-						)
-					)
-				),
+			modifier = modifier.background(tint),
 			contentAlignment = Alignment.Center
 		) {
-			Icon(
-				imageVector = Icons.Default.MusicNote,
-				contentDescription = null,
-				tint = MaterialTheme.colorScheme.onPrimaryContainer,
-				modifier = Modifier.size(24.dp)
-			)
+			if (fallbackLabel.isNotBlank()) {
+				Text(
+					text = fallbackLabel.first().uppercase(),
+					style = MaterialTheme.typography.titleMedium,
+					color = MaterialTheme.colorScheme.onPrimaryContainer
+				)
+			} else {
+				Icon(
+					imageVector = Icons.Default.MusicNote,
+					contentDescription = null,
+					tint = MaterialTheme.colorScheme.onPrimaryContainer,
+					modifier = Modifier.size(24.dp)
+				)
+			}
 		}
 	}
 }

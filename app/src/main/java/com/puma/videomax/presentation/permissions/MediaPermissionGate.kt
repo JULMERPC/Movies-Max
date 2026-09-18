@@ -56,7 +56,7 @@ fun MediaPermissionGate(
 			)
 			Spacer(modifier = Modifier.height(VideoMaxDimens.spacingSm))
 			Text(
-				text = "videomax necesita permiso para escanear y reproducir los videos y música almacenados en este dispositivo.",
+				text = "videomax necesita permiso para escanear y reproducir los videos y música almacenados en este dispositivo, y para mostrar la notificación de reproducción.",
 				style = MaterialTheme.typography.bodyLarge,
 				color = VideoMaxTheme.extended.textTertiary,
 				textAlign = TextAlign.Center
@@ -75,16 +75,38 @@ fun requiredMediaPermissions(): Array<String> =
 			arrayOf(
 				Manifest.permission.READ_MEDIA_VIDEO,
 				Manifest.permission.READ_MEDIA_AUDIO,
-				Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+				Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED,
+				Manifest.permission.POST_NOTIFICATIONS
 			)
 		Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
 			arrayOf(
 				Manifest.permission.READ_MEDIA_VIDEO,
-				Manifest.permission.READ_MEDIA_AUDIO
+				Manifest.permission.READ_MEDIA_AUDIO,
+				// Notificaciones junto a video/música: el servicio de audio
+				// publica su notificación persistente desde el primer play.
+				Manifest.permission.POST_NOTIFICATIONS
 			)
 		else ->
 			arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
 	}
+
+/**
+ * Kept for callers that check notification state independently. The permission
+ * itself is requested together with media access (see [requiredMediaPermissions]).
+ */
+fun requiredNotificationPermission(): Array<String> =
+	if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+		arrayOf(Manifest.permission.POST_NOTIFICATIONS)
+	} else {
+		emptyArray()
+	}
+
+fun hasNotificationPermission(context: android.content.Context): Boolean {
+	if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
+	return ContextCompat.checkSelfPermission(
+		context, Manifest.permission.POST_NOTIFICATIONS
+	) == android.content.pm.PackageManager.PERMISSION_GRANTED
+}
 
 fun hasMediaPermission(activity: Activity): Boolean {
 	val selected = ContextCompat.checkSelfPermission(

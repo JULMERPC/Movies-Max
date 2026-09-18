@@ -357,15 +357,15 @@ class SongRepositoryImpl @Inject constructor(
 	}
 
 	override suspend fun updateFavorite(songId: Long, isFavorite: Boolean) {
-		songDao.updateFavorite(songId, isFavorite)
+		runCatching { songDao.updateFavorite(songId, isFavorite) }
 	}
 
 	override suspend fun updateLastPosition(songId: Long, positionMs: Long) {
-		songDao.updateLastPosition(songId, positionMs)
+		runCatching { songDao.updateLastPosition(songId, positionMs) }
 	}
 
 	override suspend fun incrementPlayCount(songId: Long) {
-		songDao.incrementPlayCount(songId)
+		runCatching { songDao.incrementPlayCount(songId) }
 	}
 
 	override suspend fun deleteSong(songId: Long) = withContext(Dispatchers.IO) {

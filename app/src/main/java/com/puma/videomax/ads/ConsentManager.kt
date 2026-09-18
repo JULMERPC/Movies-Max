@@ -50,16 +50,22 @@ class ConsentManager @Inject constructor(
         builder.build()
     }
 
+    init {
+        Log.d(TAG, "ConsentManager initialized - canRequestAds=${consentInformation.canRequestAds()}, isDebuggable=$isDebuggable")
+    }
+
     fun requestConsentInfoUpdate(
         activity: Activity,
         onReady: (() -> Unit)? = null
     ) {
+        Log.d(TAG, "requestConsentInfoUpdate called - current canRequestAds=${consentInformation.canRequestAds()}")
         consentInformation.requestConsentInfoUpdate(
             activity,
             params,
             {
-                Log.d(TAG, "Consent info updated")
-                _canRequestAds.value = consentInformation.canRequestAds()
+                val newValue = consentInformation.canRequestAds()
+                Log.d(TAG, "Consent info updated - canRequestAds=$newValue, privacyOptionsRequired=${consentInformation.privacyOptionsRequirementStatus}")
+                _canRequestAds.value = newValue
                 _privacyOptionsRequired.value =
                     consentInformation.privacyOptionsRequirementStatus ==
                         ConsentInformation.PrivacyOptionsRequirementStatus.REQUIRED
@@ -67,8 +73,9 @@ class ConsentManager @Inject constructor(
                 onReady?.invoke()
             },
             { requestConsentError ->
-                Log.w(TAG, "Consent info update failed: ${requestConsentError.message}")
-                _canRequestAds.value = consentInformation.canRequestAds()
+                val newValue = consentInformation.canRequestAds()
+                Log.w(TAG, "Consent info update failed: ${requestConsentError.message}, canRequestAds=$newValue")
+                _canRequestAds.value = newValue
                 _consentReady.value = true
                 onReady?.invoke()
             }
@@ -79,11 +86,15 @@ class ConsentManager @Inject constructor(
         activity: Activity,
         onDismissed: (() -> Unit)? = null
     ) {
+        Log.d(TAG, "loadAndShowConsentFormIfRequired called - current canRequestAds=${consentInformation.canRequestAds()}")
         UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity) { formError ->
+            val newValue = consentInformation.canRequestAds()
             if (formError != null) {
-                Log.w(TAG, "Consent form error: ${formError.message}")
+                Log.w(TAG, "Consent form error: ${formError.message}, canRequestAds=$newValue")
+            } else {
+                Log.d(TAG, "Consent form dismissed - canRequestAds=$newValue")
             }
-            _canRequestAds.value = consentInformation.canRequestAds()
+            _canRequestAds.value = newValue
             _privacyOptionsRequired.value =
                 consentInformation.privacyOptionsRequirementStatus ==
                     ConsentInformation.PrivacyOptionsRequirementStatus.REQUIRED
@@ -95,17 +106,22 @@ class ConsentManager @Inject constructor(
         activity: Activity,
         onDismissed: (() -> Unit)? = null
     ) {
+        Log.d(TAG, "showPrivacyOptionsForm called")
         UserMessagingPlatform.showPrivacyOptionsForm(activity) { formError ->
+            val newValue = consentInformation.canRequestAds()
             if (formError != null) {
                 Log.w(TAG, "Privacy options form error: ${formError.message}")
+            } else {
+                Log.d(TAG, "Privacy options form dismissed - canRequestAds=$newValue")
             }
-            _canRequestAds.value = consentInformation.canRequestAds()
+            _canRequestAds.value = newValue
             onDismissed?.invoke()
         }
     }
 
     fun reset() {
         if (isDebuggable) {
+            Log.d(TAG, "reset called - resetting consent state")
             consentInformation.reset()
             _canRequestAds.value = false
             _privacyOptionsRequired.value = false

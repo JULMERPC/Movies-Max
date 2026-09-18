@@ -60,7 +60,7 @@ import androidx.lifecycle.viewModelScope
 import coil.compose.AsyncImage
 import com.puma.videomax.presentation.theme.VideoMaxDimens
 import com.puma.videomax.presentation.theme.VideoMaxTheme
-import com.puma.videomax.presentation.theme.screenGradient
+import com.puma.videomax.presentation.theme.screenColor
 import coil.request.ImageRequest
 import coil.decode.VideoFrameDecoder
 import com.puma.videomax.domain.model.AppSettings
@@ -152,7 +152,7 @@ fun PrivateFolderScreen(
 	var showSetPin by remember { mutableStateOf(false) }
 	var showAddVideos by remember { mutableStateOf(false) }
 
-	val gradient = screenGradient()
+	val bgColor = screenColor()
 
 	Scaffold(
 		containerColor = Color.Transparent,
@@ -178,7 +178,7 @@ fun PrivateFolderScreen(
 		Box(
 			modifier = Modifier
 				.fillMaxSize()
-				.background(gradient)
+				.background(bgColor)
 				.padding(padding)
 		) {
 			when {

@@ -16,8 +16,11 @@ import com.puma.videomax.domain.model.MusicSortOption
 import com.puma.videomax.domain.model.Song
 import com.puma.videomax.domain.repository.SongRepository
 import com.puma.videomax.domain.repository.SettingsRepository
+import com.puma.videomax.domain.monetization.MonetizationRepository
 import com.puma.videomax.domain.usecase.GetAlbumsUseCase
+import com.puma.videomax.domain.usecase.GetAlbumSongsUseCase
 import com.puma.videomax.domain.usecase.GetArtistsUseCase
+import com.puma.videomax.domain.usecase.GetArtistSongsUseCase
 import com.puma.videomax.domain.usecase.GetSongByIdUseCase
 import com.puma.videomax.domain.usecase.ObserveMusicFoldersUseCase
 import com.puma.videomax.domain.usecase.ObserveSongCountUseCase
@@ -76,12 +79,24 @@ class MusicViewModel @Inject constructor(
 	private val toggleSongFavorite: ToggleSongFavoriteUseCase,
 	private val getSongById: GetSongByIdUseCase,
 	private val getAlbums: GetAlbumsUseCase,
+	private val getAlbumSongs: GetAlbumSongsUseCase,
 	private val getArtists: GetArtistsUseCase,
+	private val getArtistSongs: GetArtistSongsUseCase,
 	private val songRepository: SongRepository,
 	private val settingsRepository: SettingsRepository,
 	private val observeSongCount: ObserveSongCountUseCase,
-	private val observeFolders: ObserveMusicFoldersUseCase
+	private val observeFolders: ObserveMusicFoldersUseCase,
+	monetization: MonetizationRepository
 ) : ViewModel() {
+
+	/**
+	 * False con Premium/pase: la lista no reserva slots de nativos (sin huecos
+	 * fantasma con espaciado) y ningún slot carga anuncios. True inicial para
+	 * no parpadear la estructura mientras DataStore resuelve.
+	 */
+	val adsEnabled: StateFlow<Boolean> = monetization.state
+		.map { !it.areAdsRemoved() }
+		.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
 	private val query = MutableStateFlow("")
 	private val sortOption = MutableStateFlow(MusicSortOption.DATE_DESC)
@@ -228,11 +243,20 @@ class MusicViewModel @Inject constructor(
 
 	fun toggleFavorite(song: Song) {
 		viewModelScope.launch {
-			toggleSongFavorite(song.id, !song.isFavorite)
+			runCatching { toggleSongFavorite(song.id, !song.isFavorite) }
 			withContext(Dispatchers.IO) {
 				refreshAlbumsAndArtists()
 			}
 		}
+	}
+
+	/** Namida album-header pattern: full song list for play-all / shuffle. */
+	suspend fun albumSongs(albumId: Long): List<Song> = withContext(Dispatchers.IO) {
+		runCatching { getAlbumSongs(albumId) }.getOrDefault(emptyList())
+	}
+
+	suspend fun artistSongs(artist: String): List<Song> = withContext(Dispatchers.IO) {
+		runCatching { getArtistSongs(artist) }.getOrDefault(emptyList())
 	}
 
 	override fun onCleared() {
